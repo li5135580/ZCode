@@ -64,6 +64,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           # 启用 electron-builder 调试日志
           DEBUG: electron-builder
+          # 告诉 bundle.mjs 使用 npx pnpm
+          ZCODE_PNPM_COMMAND: "npx pnpm@10.33.2"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5

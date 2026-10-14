@@ -38,7 +38,8 @@ const runtimeModuleLookupRoots = [
   resolve(desktopRoot, "node_modules", ".pnpm", "node_modules"),
   resolve(workspaceRoot, "node_modules", ".pnpm", "node_modules"),
 ];
-const pnpmCommand = "pnpm";
+// 支持通过环境变量覆盖 pnpm 命令（用于 CI 环境）
+const pnpmCommand = process.env.ZCODE_PNPM_COMMAND || "pnpm";
 const DEFAULT_TARGET_OS = "mac";
 const DEFAULT_TARGET_ARCH = "arm64";
 const desktopDistDir = process.env.ZCODE_DESKTOP_DIST_DIR || "dist";
