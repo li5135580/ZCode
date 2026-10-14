@@ -39,27 +39,20 @@ jobs:
         with:
           node-version: '24.14.0'  # 精确锁定版本
 
-      - name: Enable corepack and install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.33.2 --activate
-          pnpm --version
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+        run: npx pnpm@10.33.2 install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
 
       - name: Print tool versions
         run: |
           node --version
-          pnpm --version
-          pnpm config get registry
+          npx pnpm@10.33.2 --version
 
       - name: Build installer
         # 桌面安装包由 packages/desktop/scripts/bundle.mjs 产出（内部调用 electron-builder），
         # 输出到 packages/desktop/dist/。显式指定目标 OS/架构，避免默认的 mac/arm64。
         # 注意：不要用根目录的 `pnpm build:zcode`，它只产出 dist/zcode/ 运行时 tar 包，
         # 且缺少 ZCODE_DIST_BASE_URL 时会直接失败，不产出桌面安装包。
-        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+        run: npx pnpm@10.33.2 --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
