@@ -7,8 +7,9 @@ import {
   NsisUpdater,
 } from "electron-updater";
 import { findFile } from "electron-updater/out/providers/Provider.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  ELECTRON_MANIFEST_API_PATH,
   buildElectronManifestUrl,
   getElectronReleasePlatform,
   ManifestUpdateProvider,
@@ -22,7 +23,7 @@ describe("ManifestUpdateProvider helpers", () => {
     expect(getElectronReleasePlatform("linux", "arm64")).toBe("linux-aarch64");
   });
 
-  it("builds the server manifest URL with platform, device_mid, and numeric channel", () => {
+  it("未指定 manifestUrl 时默认走更新源常量（GitHub Releases latest.yml），并附加平台与通道参数", () => {
     const url = buildElectronManifestUrl({
       endpointOrigin: "https://zcode.example.test/base/path",
       platform: "darwin-aarch64",
@@ -30,11 +31,35 @@ describe("ManifestUpdateProvider helpers", () => {
       channel: "preview",
     });
 
-    expect(url.origin).toBe("https://zcode.example.test");
-    expect(url.pathname).toBe("/api/v1/releases/electron/manifest");
+    // 默认值随 ELECTRON_MANIFEST_API_PATH 解析（默认 GitHub Releases；可用 ZCODE_UPDATE_FEED_URL 覆盖）。
+    expect(url.origin).toBe(new URL(ELECTRON_MANIFEST_API_PATH).origin);
+    expect(url.pathname).toBe(new URL(ELECTRON_MANIFEST_API_PATH).pathname);
     expect(url.searchParams.get("platform")).toBe("darwin-aarch64");
     expect(url.searchParams.get("device_mid")).toBe("mid-1");
     expect(url.searchParams.get("channel")).toBe("3");
+  });
+
+  it("更新源默认指向 GitHub Releases latest.yml，并可用 ZCODE_UPDATE_FEED_URL 覆盖", async () => {
+    vi.resetModules();
+
+    delete process.env.ZCODE_UPDATE_FEED_URL;
+    const defaultModule = await import(
+      "../src/main/manifestUpdateProvider.js"
+    ) as typeof import("@desktop/main/manifestUpdateProvider.js");
+    expect(defaultModule.ELECTRON_MANIFEST_API_PATH).toBe(
+      "https://github.com/li5135580/ZCode/releases/latest/download/latest.yml",
+    );
+
+    process.env.ZCODE_UPDATE_FEED_URL = "https://override.example.test/latest.yml";
+    vi.resetModules();
+    const overriddenModule = (await import(
+      "../src/main/manifestUpdateProvider.js",
+    )) as typeof import("@desktop/main/manifestUpdateProvider.js");
+    expect(overriddenModule.ELECTRON_MANIFEST_API_PATH).toBe(
+      "https://override.example.test/latest.yml",
+    );
+
+    delete process.env.ZCODE_UPDATE_FEED_URL;
   });
 
   it("overrides existing manifest URL query with runtime platform, device, and channel", () => {

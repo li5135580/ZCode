@@ -13,6 +13,11 @@ export const DEFAULT_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
 export const TEST_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
 export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/ws";
 export const WEB_REMOTE_CONTROL_V4_MIN_APP_VERSION = "3.4.0";
+// 更新检测源默认指向二开仓库的 GitHub Releases（electron-builder latest.yml）；
+// 可通过环境变量 `ZCODE_UPDATE_FEED_URL` 覆盖，命令行 `--zcode-update-feed-url` 优先级更高。
+export const DEFAULT_UPDATE_FEED_URL =
+  "https://github.com/li5135580/ZCode/releases/latest/download/latest.yml";
+export const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
 
 export interface BuildZCodeEndpointUrlsOptions {
   appVersion?: string;

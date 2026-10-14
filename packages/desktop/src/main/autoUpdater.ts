@@ -8,6 +8,7 @@ import {
   DEFAULT_LOCALE,
   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
   PlatformChannels,
+  UPDATE_FEED_URL_ENV,
   ZCODE_VERSION,
   desktopMenuMessageIds,
   formatDesktopMenuMessage,
@@ -25,7 +26,6 @@ import { ManifestUpdateProvider, getElectronReleasePlatform } from "./manifestUp
 export const CHECK_FOR_UPDATE_MENU_ID = "check-for-update";
 const AUTO_UPDATE_POLL_INTERVAL_MS = 15 * 60 * 1000;
 const AUTO_UPDATE_VISIBLE_POLL_INTERVAL_MS = 2 * 60 * 1000;
-const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
 const UPDATE_FEED_URL_SWITCH = "--zcode-update-feed-url";
 const DEV_AUTO_UPDATE_ENV = "ZCODE_AUTO_UPDATE_DEV";
 const DEV_AUTO_UPDATE_SWITCH = "--zcode-auto-update-dev";
@@ -735,6 +735,8 @@ export function resolveUpdateFeedSourceFromStartupConfig(
 ): RuntimeUpdateFeedSource | undefined {
   const argv = options.argv ?? process.argv;
   const env = options.env ?? process.env;
+  // 更新源优先级：命令行参数 > 环境变量 > 默认值（默认值由
+  // manifestUpdateProvider 的 ELECTRON_MANIFEST_API_PATH 兜底，未设置时返回 undefined）。
   const feedUrl = readSwitchValue(argv, UPDATE_FEED_URL_SWITCH) ?? env[UPDATE_FEED_URL_ENV]?.trim();
   return feedUrl
     ? {

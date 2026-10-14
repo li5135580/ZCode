@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { modelSelectionSchema, type ModelSelection } from "./model-selection.js";
 import type { AgentPermissionMode } from "./subagents-types.js";
+import {
+  subagentModelChainSchema,
+  type SubagentModelChain,
+} from "./subagent-model-chain.js";
 
 export type AgentProfileSource = "built-in" | "project" | "user";
 export type AgentMemoryScope = "user" | "project" | "local";
@@ -15,6 +19,8 @@ export interface AgentProfile {
   mcpServers?: readonly string[];
   memory?: AgentMemoryScope;
   modelSelection?: ModelSelection;
+  /** 多模型链（新功能，优先级高于 modelSelection） */
+  modelChain?: SubagentModelChain;
   name: string;
   path?: string;
   permissionMode?: AgentPermissionMode;
@@ -44,6 +50,7 @@ export const agentProfileSchema = z
     systemPrompt: z.string(),
     path: z.string().optional(),
     modelSelection: modelSelectionSchema.optional(),
+    modelChain: subagentModelChainSchema.optional(),
     background: z.boolean().optional(),
     injectAgentsMd: z.boolean().optional(),
     color: z

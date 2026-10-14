@@ -327,6 +327,7 @@ export { bashOutputDisplaySchema } from "./bash-output-display.js";
 export * from "./subagent-runtime-config.js";
 
 export * from "./subagent-profile.js";
+export * from "./subagent-model-chain.js";
 export { parseAgentProfileFromMarkdown } from "./subagent-profile-parser.js";
 
 export * from "./localTtft.js";
