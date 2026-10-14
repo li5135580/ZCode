@@ -28,6 +28,8 @@ jobs:
       ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
       NPM_CONFIG_ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
       ELECTRON_BUILDER_BINARIES_MIRROR: https://registry.npmmirror.com/-/binary/electron-builder-binaries/
+      # 设置 PNPM_HOME 环境变量
+      PNPM_HOME: ~/.local/share/pnpm
 
     steps:
       - name: Checkout
@@ -38,14 +40,15 @@ jobs:
         with:
           node-version: '24.14.0'
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.2
-          run_install: false
+      - name: Install pnpm via npm
+        run: |
+          npm install -g pnpm@10.33.2
+          echo "PATH=$PATH" >> $GITHUB_ENV
 
       - name: Verify pnpm installation
-        run: pnpm --version
+        run: |
+          which pnpm || where pnpm
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
