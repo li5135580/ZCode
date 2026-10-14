@@ -63,6 +63,91 @@ modelChain:
 
 ---
 
+## 📦 安装使用
+
+### 方案 1：使用补丁包（推荐）
+
+**适合用户**：想快速体验二开功能，不想自己构建
+
+**步骤**：
+
+1. **安装官方 ZCode**
+   - 从 [官方 Releases](https://github.com/zai-org/ZCode/releases/latest) 下载并安装 ZCode v3.14.3
+
+2. **下载并应用补丁**
+
+   **方式 A：使用可执行文件（最简单）**
+   
+   ```bash
+   # 下载补丁包
+   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
+   
+   # 解压
+   unzip zcode-patch.zip
+   
+   # Windows：双击运行
+   zcode-patch/dist/apply-patch-win.exe
+   
+   # macOS：
+   chmod +x zcode-patch/dist/apply-patch-macos
+   ./zcode-patch/dist/apply-patch-macos
+   
+   # Linux：
+   chmod +x zcode-patch/dist/apply-patch-linux
+   ./zcode-patch/dist/apply-patch-linux
+   ```
+
+   **方式 B：使用 Node.js（需要安装 Node.js）**
+   
+   ```bash
+   # 下载补丁包
+   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
+   
+   # 解压
+   unzip zcode-patch.zip
+   
+   # 运行补丁应用器
+   node zcode-patch/scripts/apply-patch.js
+   ```
+
+3. **重启 ZCode**
+   - 补丁应用完成后，重启 ZCode 即可享受增强功能
+
+**恢复官方版本**：
+
+```bash
+# 使用可执行文件
+zcode-patch/dist/restore-backup-win.exe  # Windows
+./zcode-patch/dist/restore-backup-macos  # macOS
+./zcode-patch/dist/restore-backup-linux  # Linux
+
+# 或使用 Node.js
+node zcode-patch/scripts/restore-backup.js
+```
+
+### 方案 2：从源码构建
+
+**适合用户**：想自定义功能或参与开发
+
+**步骤**：
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/li5135580/ZCode.git
+cd ZCode
+
+# 2. 安装依赖
+pnpm install
+
+# 3. 构建
+pnpm build:zcode
+
+# 4. 运行
+pnpm dev:desktop
+```
+
+---
+
 ## 原版说明
 
 ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent。本仓库包含客户端、后端服务、共享 UI，以及 Agent CLI 与运行时源码。

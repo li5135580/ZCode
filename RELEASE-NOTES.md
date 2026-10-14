@@ -28,7 +28,12 @@
 
 | 文件 | 说明 | 大小 |
 |------|------|------|
-| `zcode-patch-v3.15.2.zip` | 二开增强补丁包 | 5.9 KB |
+| `zcode-patch-v3.15.2.zip` | 二开增强补丁包（包含可执行文件） | 94 MB |
+
+**补丁包内容**：
+- 可执行文件（Windows、macOS、Linux）
+- 配置文件
+- 使用说明
 
 ## 🚀 使用方法
 
@@ -38,7 +43,28 @@
 
 ### 2. 下载并应用补丁
 
-#### Windows / macOS / Linux
+#### 方式 A：使用可执行文件（最简单）
+
+```bash
+# 下载补丁包
+curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
+
+# 解压
+unzip zcode-patch.zip
+
+# Windows：双击运行
+zcode-patch/dist/apply-patch-win.exe
+
+# macOS：
+chmod +x zcode-patch/dist/apply-patch-macos
+./zcode-patch/dist/apply-patch-macos
+
+# Linux：
+chmod +x zcode-patch/dist/apply-patch-linux
+./zcode-patch/dist/apply-patch-linux
+```
+
+#### 方式 B：使用 Node.js（需要安装 Node.js）
 
 ```bash
 # 下载补丁包
@@ -57,9 +83,13 @@ node zcode-patch/scripts/apply-patch.js
 
 ## 🔄 恢复官方版本
 
-如果想恢复到官方版本，运行：
-
 ```bash
+# 使用可执行文件
+zcode-patch/dist/restore-backup-win.exe  # Windows
+./zcode-patch/dist/restore-backup-macos  # macOS
+./zcode-patch/dist/restore-backup-linux  # Linux
+
+# 或使用 Node.js
 node zcode-patch/scripts/restore-backup.js
 ```
 
@@ -74,6 +104,7 @@ node zcode-patch/scripts/restore-backup.js
 1. **兼容性**：本补丁仅适用于 ZCode v3.14.3，其他版本可能不兼容。
 2. **备份**：补丁应用器会自动备份原文件，可以随时恢复。
 3. **更新**：当官方发布新版本时，需要等待补丁更新。
+4. **可执行文件**：补丁包包含可执行文件，无需安装 Node.js 即可运行。
 
 ## 🐛 问题反馈
 

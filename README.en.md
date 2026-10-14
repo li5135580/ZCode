@@ -63,6 +63,91 @@ modelChain:
 
 ---
 
+## 📦 Installation
+
+### Option 1: Using Patch Package (Recommended)
+
+**For users who want to quickly try the enhanced features without building from source**
+
+**Steps**:
+
+1. **Install Official ZCode**
+   - Download and install ZCode v3.14.3 from [Official Releases](https://github.com/zai-org/ZCode/releases/latest)
+
+2. **Download and Apply Patch**
+
+   **Method A: Using Executable (Easiest)**
+   
+   ```bash
+   # Download patch package
+   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
+   
+   # Extract
+   unzip zcode-patch.zip
+   
+   # Windows: Double-click to run
+   zcode-patch/dist/apply-patch-win.exe
+   
+   # macOS:
+   chmod +x zcode-patch/dist/apply-patch-macos
+   ./zcode-patch/dist/apply-patch-macos
+   
+   # Linux:
+   chmod +x zcode-patch/dist/apply-patch-linux
+   ./zcode-patch/dist/apply-patch-linux
+   ```
+
+   **Method B: Using Node.js (Requires Node.js)**
+   
+   ```bash
+   # Download patch package
+   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
+   
+   # Extract
+   unzip zcode-patch.zip
+   
+   # Run patch applier
+   node zcode-patch/scripts/apply-patch.js
+   ```
+
+3. **Restart ZCode**
+   - After applying the patch, restart ZCode to enjoy the enhanced features
+
+**Restore to Official Version**:
+
+```bash
+# Using executable
+zcode-patch/dist/restore-backup-win.exe  # Windows
+./zcode-patch/dist/restore-backup-macos  # macOS
+./zcode-patch/dist/restore-backup-linux  # Linux
+
+# Or using Node.js
+node zcode-patch/scripts/restore-backup.js
+```
+
+### Option 2: Build from Source
+
+**For users who want to customize features or contribute to development**
+
+**Steps**:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/li5135580/ZCode.git
+cd ZCode
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Build
+pnpm build:zcode
+
+# 4. Run
+pnpm dev:desktop
+```
+
+---
+
 ## Original Description
 
 ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. This repository contains the clients, backend services, shared UI, and Agent CLI and runtime source code.
