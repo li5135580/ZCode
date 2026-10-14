@@ -1,0 +1,25 @@
+name: Test Node Only
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Print Node and NPM version
+        run: |
+          echo "Node version:"
+          node --version
+          echo "NPM version:"
+          npm --version
