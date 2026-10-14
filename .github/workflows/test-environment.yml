@@ -1,0 +1,35 @@
+name: Test Environment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Print environment
+        run: |
+          echo "Node version:"
+          node --version
+          echo "NPM version:"
+          npm --version
+          echo "PNPM version:"
+          pnpm --version || echo "pnpm not found"
+          echo "PATH:"
+          echo $PATH
+          echo "Which node:"
+          which node
+          echo "Which npm:"
+          which npm
+          echo "Which pnpm:"
+          which pnpm || echo "pnpm not found"
