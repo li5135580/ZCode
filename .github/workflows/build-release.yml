@@ -38,33 +38,16 @@ jobs:
         with:
           node-version: '24.14.0'
 
-      - name: Install pnpm
-        shell: bash
-        run: |
-          npm install -g pnpm@10.33.2
-          echo "PNPM_HOME=$(npm config get prefix)/bin" >> $GITHUB_ENV
-          echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
-
-      - name: Verify pnpm installation
-        shell: bash
-        run: |
-          which pnpm
-          pnpm --version
-
-      - name: Install dependencies
-        shell: bash
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+      - name: Install dependencies with npm
+        run: npm install --legacy-peer-deps
 
       - name: Print tool versions
-        shell: bash
         run: |
           node --version
-          pnpm --version
-          pnpm config get registry
+          npm --version
 
-      - name: Build installer
-        shell: bash
-        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+      - name: Build installer with npm
+        run: npm run --filter @zcode/desktop bundle -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
