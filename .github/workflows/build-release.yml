@@ -46,6 +46,11 @@ jobs:
         run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
+          ZCODE_SKIP_REMOTE_ASSETS: "1"
+          ZCODE_SKIP_PREPARE: "0"
+          ZCODE_SKIP_BUILD: "0"
+          # CI 环境跳过签名
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
