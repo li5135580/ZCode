@@ -66,7 +66,9 @@ export interface SubagentModelChainEditorProps {
 }
 
 /** 备用模型数量上限 */
-const MAX_FALLBACKS = 2;
+export const MAX_SUBAGENT_MODEL_CHAIN_FALLBACKS = 2;
+/** 新建模型链时每个模型的默认失败重试次数，与 shared 的 subagentModelChainSchema 默认值一致 */
+export const DEFAULT_SUBAGENT_MODEL_CHAIN_RETRY_COUNT = 5;
 /** 目录内模型不参与锁定 */
 const MODEL_ITEM_NEVER_LOCKED = () => false;
 
@@ -172,11 +174,11 @@ function SubagentModelSlot({
     return [
       {
         key: "subagent-model-chain:clear",
-        label: "清除模型",
+        label: intl.formatMessage({ id: "settings.subagents.modelChain.clearModel" }),
         onSelect: handleClear,
       },
     ];
-  }, [handleClear, pickerValue]);
+  }, [handleClear, intl, pickerValue]);
 
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
@@ -249,7 +251,7 @@ export function SubagentModelChainEditor({
   );
 
   const handleAddFallback = useCallback(() => {
-    if (value.fallbacks.length < MAX_FALLBACKS) {
+    if (value.fallbacks.length < MAX_SUBAGENT_MODEL_CHAIN_FALLBACKS) {
       onChange({
         ...value,
         fallbacks: [...value.fallbacks, { providerId: "", modelId: "" }],
@@ -276,14 +278,31 @@ export function SubagentModelChainEditor({
     [value, onChange],
   );
 
+  const { intl } = useZCodeIntl();
+  const primaryLabel = intl.formatMessage({ id: "settings.subagents.modelChain.primary" });
+  const fallbacksLabel = intl.formatMessage({ id: "settings.subagents.modelChain.fallbacks" });
+  const retryCountLabel = intl.formatMessage({ id: "settings.subagents.modelChain.retryCount" });
+  const canAddFallback = value.fallbacks.length < MAX_SUBAGENT_MODEL_CHAIN_FALLBACKS;
+
   return (
     <div className={cn("space-y-4", className)}>
+      <div className="space-y-1">
+        <h4 className="text-ui-base font-medium text-foreground">
+          {intl.formatMessage({ id: "settings.subagents.modelChain.title" })}
+        </h4>
+        <p className="text-ui-sm text-foreground-subtle">
+          {intl.formatMessage({ id: "settings.subagents.modelChain.description" })}
+        </p>
+      </div>
+
       {/* 主模型 */}
       <div className="space-y-2">
-        <Label>主模型</Label>
+        <Label>{primaryLabel}</Label>
         <SubagentModelSlot
           selection={value.primary}
-          placeholder="选择主模型"
+          placeholder={intl.formatMessage({
+            id: "settings.subagents.modelChain.primaryPlaceholder",
+          })}
           modelGroups={modelGroups}
           modelSelectionView={modelSelectionView}
           modelSelectionLoading={modelSelectionLoading}
@@ -291,14 +310,24 @@ export function SubagentModelChainEditor({
           onChange={handlePrimaryChange}
           onManageModels={onManageModels}
         />
-        <p className="text-sm text-muted-foreground">首先尝试使用的模型</p>
+        <p className="text-ui-sm text-foreground-subtle">
+          {intl.formatMessage({ id: "settings.subagents.modelChain.primaryDescription" })}
+        </p>
       </div>
 
       {/* 备用模型列表 */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>备用模型（最多 {MAX_FALLBACKS} 个）</Label>
-          {value.fallbacks.length < MAX_FALLBACKS && (
+        <div className="flex items-center justify-between gap-2">
+          <Label>
+            {fallbacksLabel}
+            <span className="ml-1 text-foreground-subtle">
+              {intl.formatMessage(
+                { id: "settings.subagents.modelChain.fallbacksLimit" },
+                { max: String(MAX_SUBAGENT_MODEL_CHAIN_FALLBACKS) },
+              )}
+            </span>
+          </Label>
+          {canAddFallback ? (
             <Button
               type="button"
               variant="outline"
@@ -306,22 +335,25 @@ export function SubagentModelChainEditor({
               onClick={handleAddFallback}
               disabled={disabled}
             >
-              <Plus className="h-4 w-4 mr-1" />
-              添加备用模型
+              <Plus data-icon="inline-start" aria-hidden="true" />
+              {intl.formatMessage({ id: "settings.subagents.modelChain.addFallback" })}
             </Button>
-          )}
+          ) : null}
         </div>
 
         {value.fallbacks.map((fallback, index) => (
           <div
             key={index}
-            className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50"
+            className="flex items-center gap-2 rounded-lg border border-border bg-card p-3"
           >
-            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <GripVertical className="size-4 shrink-0 text-foreground-subtle" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <SubagentModelSlot
                 selection={fallback}
-                placeholder={`备用模型 ${index + 1}`}
+                placeholder={intl.formatMessage(
+                  { id: "settings.subagents.modelChain.fallbackPlaceholder" },
+                  { index: String(index + 1) },
+                )}
                 modelGroups={modelGroups}
                 modelSelectionView={modelSelectionView}
                 modelSelectionLoading={modelSelectionLoading}
@@ -333,25 +365,31 @@ export function SubagentModelChainEditor({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon-md"
               onClick={() => handleRemoveFallback(index)}
               disabled={disabled}
+              title={intl.formatMessage(
+                { id: "settings.subagents.modelChain.removeFallback" },
+                { index: String(index + 1) },
+              )}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="size-3.5" aria-hidden="true" />
             </Button>
           </div>
         ))}
 
-        {value.fallbacks.length === 0 && (
-          <p className="text-sm text-muted-foreground">主模型失败时将使用备用模型</p>
-        )}
+        {value.fallbacks.length === 0 ? (
+          <p className="text-ui-sm text-foreground-subtle">
+            {intl.formatMessage({ id: "settings.subagents.modelChain.fallbacksEmpty" })}
+          </p>
+        ) : null}
       </div>
 
       {/* 重试次数 */}
       <div className="space-y-2">
-        <Label htmlFor="retry-count">失败重试次数</Label>
+        <Label htmlFor="subagent-model-chain-retry-count">{retryCountLabel}</Label>
         <Input
-          id="retry-count"
+          id="subagent-model-chain-retry-count"
           type="number"
           min={1}
           max={10}
@@ -360,8 +398,11 @@ export function SubagentModelChainEditor({
           disabled={disabled}
           className="w-24"
         />
-        <p className="text-sm text-muted-foreground">
-          每个模型失败 {value.retryCount} 次后切换到下一个模型
+        <p className="text-ui-sm text-foreground-subtle">
+          {intl.formatMessage(
+            { id: "settings.subagents.modelChain.retryCountDescription" },
+            { count: String(value.retryCount) },
+          )}
         </p>
       </div>
     </div>

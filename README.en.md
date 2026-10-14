@@ -1,4 +1,4 @@
-# ZCode
+# ZCode (Enhanced Fork)
 
 <div align="center">
   <img src="public/logo/icons/1024x1024.png" alt="ZCode" width="128" height="128" />
@@ -11,10 +11,65 @@
   <a href="README.md">简体中文</a> | English
 </p>
 
+> **This is an enhanced fork of ZCode**, based on [zai-org/ZCode](https://github.com/zai-org/ZCode), with the following enhancements:
+
+## ✨ Enhanced Features
+
+### 1. Subagent Multi-Model Chain Support
+
+- **Multi-Model Binding**: Each subagent supports binding up to 3 models (1 primary + 2 fallbacks)
+- **Independent Reasoning Levels**: Each model can have its own reasoning level
+- **Smart Fallback**: Execute in order, automatically switch to fallback after 5 failures
+- **Main Agent Fallback**: Falls back to main agent when all models fail
+
+**Configuration Example** (Markdown frontmatter):
+
+```yaml
+---
+name: my-agent
+description: My custom subagent
+modelChain:
+  primary:
+    providerId: zai
+    modelId: glm-4.6
+    reasoningLevel: high
+  fallbacks:
+    - providerId: openai
+      modelId: gpt-5
+      reasoningLevel: medium
+    - providerId: anthropic
+      modelId: claude-4
+      reasoningLevel: low
+  retryCount: 5
+---
+```
+
+### 2. Automatic Model Fetching
+
+- **Auto-fetch Upstream Models**: Automatically fetch model lists from OpenAI, Anthropic, Z.AI, and other providers
+- **Auto-detect Parameters**: Automatically detect model parameters like contextWindow, maxOutputTokens, reasoningLevel
+- **One-click Add**: Add fetched models with one click in the model settings page
+
+### 3. GitHub Actions Auto Sync & Release
+
+- **Auto Sync Upstream**: Check upstream repository updates hourly, auto-merge and apply custom patches
+- **Auto Build & Release**: Automatically build multi-platform packages (Windows, macOS, Linux) and release on push
+- **Conflict Notification**: Automatically create Issue when merge conflicts occur
+
+### 4. Custom Update Source
+
+- **Update Source Switch**: Client update detection source switched to this repository's GitHub Releases
+- **Environment Variable Override**: Support custom update source via `ZCODE_UPDATE_FEED_URL` environment variable
+
+---
+
+## Original Description
+
 ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. This repository contains the clients, backend services, shared UI, and Agent CLI and runtime source code.
 
 ## Updates
 
+- 2026-10-14: Enhanced version v3.15.2 released, adding subagent multi-model chain, automatic model fetching, GitHub Actions auto sync, and more.
 - 2026-10-10: Updated to ZCode v3.15.1.
 - 2026-9-23: Updated to ZCode v3.14.3.
 

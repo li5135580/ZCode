@@ -848,6 +848,10 @@ export function InlineEditableProviderCard({
           providerName={getProviderFormLabel(provider)}
           providerEnabled={provider.enabled}
           providerAccess={provider.config.access}
+          // 自动获取模型列表复用连接区的未保存草稿，避免用户改完地址后还要先保存一次。
+          providerApiFormat={apiFormat}
+          providerBaseUrl={baseUrlValue}
+          providerApiKey={apiKeyValue}
           models={models}
           onTestModel={onTestModel ? handleTestModel : undefined}
           onModelCommit={handleModelCommit}

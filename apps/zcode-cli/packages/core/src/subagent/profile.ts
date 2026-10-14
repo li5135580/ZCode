@@ -3,7 +3,11 @@ import { GENERAL_PURPOSE_AGENT_TYPE, buildGeneralPurposeSystemPrompt } from "./g
 import { EXPLORE_AGENT_TYPE } from "./explore.js";
 import { formatExploreAllowedToolsForAgentDescription } from "./explore-tools.js";
 import { filterSubagentChildToolNames } from "./tool-policy.js";
-import type { ModelSelection, AgentProfile } from "@zcode/shared";
+import {
+  type AgentProfile,
+  type ModelSelection,
+  type SubagentModelChain,
+} from "@zcode/shared";
 export { parseAgentProfileFromMarkdown } from "@zcode/shared";
 export type {
   AgentProfile,
@@ -19,6 +23,30 @@ export const DEFAULT_SUBAGENT_TYPE = GENERAL_PURPOSE_AGENT_TYPE;
 export type BuiltInSubagentModelSelectionOverrides = Partial<
   Record<typeof DEFAULT_SUBAGENT_TYPE | typeof EXPLORE_AGENT_TYPE, ModelSelection>
 >;
+
+/**
+ * profile 声明的多模型链；未声明时返回 `undefined`（此时按单模型选择执行）。
+ *
+ * runner 用它判断是否需要启用「primary → fallbacks → 主 Agent 兜底」的执行与回退。
+ */
+export function resolveAgentProfileModelChain(
+  profile: Pick<AgentProfile, "modelChain">,
+): SubagentModelChain | undefined {
+  return profile.modelChain;
+}
+
+/**
+ * profile 声明的执行选型：模型链优先，回退到单模型选择。
+ *
+ * 模型链是 frontmatter `modelChain` 的显式意图（primary + fallbacks），存在时它就是
+ * 该子智能体的权威选型；只有没有链时才继续消费旧的 `modelSelection`。
+ * 两者都缺省返回 `undefined`，由调用方回退到父模型继承。
+ */
+export function resolveAgentProfileModelSelection(
+  profile: Pick<AgentProfile, "modelChain" | "modelSelection">,
+): ModelSelection | undefined {
+  return profile.modelChain?.primary ?? profile.modelSelection;
+}
 
 export function createBuiltInExploreAgentProfile(
   options: { modelSelection?: ModelSelection } = {},

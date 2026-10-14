@@ -166,7 +166,13 @@ function parseNestedBlock(
       if (rawValue.trim() === "") {
         const nextLine = lines[currentIndex + 1];
         if (nextLine && /^\s+\S/u.test(nextLine)) {
-          const nestedResult = parseNestedBlock(lines, currentIndex + 1);
+          // `- item` 形式的列表（如 modelChain.fallbacks）必须按列表解析，
+          // 否则会退化成空数组，备用模型在运行时静默丢失。
+          const nestedList = /^\s+-\s/u.test(nextLine)
+            ? parseNestedListBlock(lines, currentIndex + 1)
+            : null;
+          const nestedResult =
+            nestedList ?? parseNestedBlock(lines, currentIndex + 1);
           if (nestedResult) {
             result[key] = nestedResult.value;
             currentIndex = nestedResult.endIndex + 1;
@@ -193,6 +199,77 @@ function parseNestedBlock(
   }
 
   return Object.keys(result).length > 0 ? { value: result, endIndex: currentIndex - 1 } : null;
+}
+
+/**
+ * 解析嵌套块中的列表（如 modelChain.fallbacks）。
+ *
+ * 支持两种列表项：映射项（`- providerId: x` 后跟更深缩进的同项字段）与标量项。
+ * 返回解析后的数组和最后一行索引；非列表内容返回 null，交回调用方按嵌套块处理。
+ */
+function parseNestedListBlock(
+  lines: string[],
+  startIndex: number,
+): { value: unknown[]; endIndex: number } | null {
+  const items: unknown[] = [];
+  let currentIndex = startIndex;
+  let itemIndent: number | null = null;
+
+  while (currentIndex < lines.length) {
+    const rawLine = lines[currentIndex]!;
+    const line = rawLine.trimEnd();
+    if (!line.trim() || line.trimStart().startsWith("#")) {
+      currentIndex++;
+      continue;
+    }
+
+    const indent = rawLine.length - rawLine.trimStart().length;
+    if (itemIndent === null) {
+      itemIndent = indent;
+    } else if (indent < itemIndent) {
+      break;
+    } else if (indent > itemIndent) {
+      // 比列表项更深的缩进已由当前项的收集逻辑消费；这里只兜底跳过。
+      currentIndex++;
+      continue;
+    }
+
+    const listMatch = line.trim().match(/^-\s*(.*)$/u);
+    if (!listMatch) break;
+    const itemText = (listMatch[1] ?? "").trim();
+    const itemKeyValue = itemText.match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
+    if (!itemKeyValue) {
+      items.push(parseScalarValue(itemText));
+      currentIndex++;
+      continue;
+    }
+
+    // 映射项：先写首行字段，再收集比列表项更深的同项字段。
+    const item: Record<string, unknown> = {};
+    const firstKey = itemKeyValue[1]!;
+    const firstValue = itemKeyValue[2] ?? "";
+    if (firstValue.trim() !== "") item[firstKey] = parseScalarValue(firstValue);
+
+    let nextIndex = currentIndex + 1;
+    while (nextIndex < lines.length) {
+      const nextLine = lines[nextIndex]!;
+      if (!nextLine.trim()) {
+        nextIndex++;
+        continue;
+      }
+      const nextIndent = nextLine.length - nextLine.trimStart().length;
+      if (nextIndent <= itemIndent) break;
+      const nextKeyValue = nextLine.trim().match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
+      if (nextKeyValue) {
+        item[nextKeyValue[1]!] = parseScalarValue(nextKeyValue[2] ?? "");
+      }
+      nextIndex++;
+    }
+    items.push(item);
+    currentIndex = nextIndex;
+  }
+
+  return items.length > 0 ? { value: items, endIndex: currentIndex - 1 } : null;
 }
 
 function parseMcpServerNames(

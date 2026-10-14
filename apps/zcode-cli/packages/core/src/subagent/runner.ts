@@ -47,8 +47,11 @@ import { dirname, join } from "node:path";
 import {
   isBuiltInExploreAgentProfile,
   normalizeAgentProfiles,
+  resolveAgentProfileModelChain,
+  resolveAgentProfileModelSelection,
   type AgentProfile,
 } from "./profile.js";
+import { executeWithModelChain } from "./model-chain-executor.js";
 import { EXPLORE_AGENT_ALLOWED_TOOLS } from "./explore-tools.js";
 import { formatLocalAgentTaskNotification } from "./completion-notification.js";
 import { filterSubagentChildToolNames } from "./tool-policy.js";
@@ -249,9 +252,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
                 parentToolCallId: request.parentToolCallId,
                 status: "running",
                 allowedTools: [...resolveAllowedTools(profile, options)],
-                model: profile.modelSelection
-                  ? `${profile.modelSelection.providerId}/${profile.modelSelection.modelId}`
-                  : undefined,
+                model: formatProfileModelLabel(profile),
               },
             );
             readyGate.resolve();
@@ -497,9 +498,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
                 status: "running",
                 allowedTools: [...resolveAllowedTools(profile, options)],
                 outputFile: lifecycle.outputFile,
-                model: profile.modelSelection
-                  ? `${profile.modelSelection.providerId}/${profile.modelSelection.modelId}`
-                  : undefined,
+                model: formatProfileModelLabel(profile),
               },
             );
             readyGate.resolve();
@@ -1131,34 +1130,37 @@ async function runAgentToCompletion(
     await executionOptions.onSessionReady?.();
     sessionReady = true;
   };
-  const childResult = await options.runExploreAgent(
-    {
-      agentId: lifecycle.agentId,
-      agentType: request.agentType,
-      allowedTools: resolveAllowedTools(lifecycle.profile, options),
-      // 显式 background Agent 的 child tool 会被镜像到父会话；
-      // 过去丢失这个来源会让父 turn 把仍在运行的 child tool 误当前台孤儿收口。这里必须
-      // 保留 getter，foreground 后续转后台时，每条 mirror event 才会读取 registry 当前值，
-      // 而不是继续携带 child 启动时的 false 快照。
-      get background() {
-        return registry.get(lifecycle.agentId)?.isBackgrounded === true;
-      },
-      disallowedTools: lifecycle.profile.disallowedTools,
-      sessionId: lifecycle.childSessionId,
-      description: request.description,
-      maxTurns: lifecycle.profile.maxTurns,
-      onSessionReady: notifySessionReady,
-      permissionMode: lifecycle.profile.permissionMode,
-      prompt: request.prompt,
-      profile: lifecycle.profile,
-      registerMessageSink: createMessageSinkRegistration(options, lifecycle, registry),
-      reportActivity: monitorOptions.reportActivity,
-      resumeFromStore: executionOptions.resumeFromStore,
-      systemPrompt: lifecycle.profile.systemPrompt,
-      workingDirectory: request.workingDirectory,
-      workspaceRoot: request.workspaceRoot,
-      traceContext: lifecycle.childTraceContext,
+  const childRequest: ExploreSubagentRuntimeRequest = {
+    agentId: lifecycle.agentId,
+    agentType: request.agentType,
+    allowedTools: resolveAllowedTools(lifecycle.profile, options),
+    // 显式 background Agent 的 child tool 会被镜像到父会话；
+    // 过去丢失这个来源会让父 turn 把仍在运行的 child tool 误当前台孤儿收口。这里必须
+    // 保留 getter，foreground 后续转后台时，每条 mirror event 才会读取 registry 当前值，
+    // 而不是继续携带 child 启动时的 false 快照。
+    get background() {
+      return registry.get(lifecycle.agentId)?.isBackgrounded === true;
     },
+    disallowedTools: lifecycle.profile.disallowedTools,
+    sessionId: lifecycle.childSessionId,
+    description: request.description,
+    maxTurns: lifecycle.profile.maxTurns,
+    onSessionReady: notifySessionReady,
+    permissionMode: lifecycle.profile.permissionMode,
+    prompt: request.prompt,
+    profile: lifecycle.profile,
+    registerMessageSink: createMessageSinkRegistration(options, lifecycle, registry),
+    reportActivity: monitorOptions.reportActivity,
+    resumeFromStore: executionOptions.resumeFromStore,
+    systemPrompt: lifecycle.profile.systemPrompt,
+    workingDirectory: request.workingDirectory,
+    workspaceRoot: request.workspaceRoot,
+    traceContext: lifecycle.childTraceContext,
+  };
+  const childResult = await executeChildAgent(
+    lifecycle.profile,
+    childRequest,
+    options,
     runOptions,
   );
   // 测试桩和旧注入实现可能尚未主动调用 readiness hook；真实 AgentRuntime 会在
@@ -1189,6 +1191,74 @@ async function runAgentToCompletion(
   };
 
   return { events: childResult.events, output };
+}
+
+/**
+ * 执行子智能体：profile 声明了模型链时按「primary → fallbacks → 主 Agent」顺序执行。
+ *
+ * 无 modelChain 时保持原样，只调用一次 `runExploreAgent`（现有单模型执行路径不变）。
+ * 链上每一步用 `modelOverride` 固定本次 child 选型（优先级高于 profile 单模型）；
+ * 全部模型失败后的「主 Agent 兜底」剥离 profile 的模型意图，让 child 回到父模型继承。
+ */
+async function executeChildAgent(
+  profile: AgentProfile,
+  request: ExploreSubagentRuntimeRequest,
+  options: ExploreSubagentPortOptions,
+  runOptions: SubagentRunOptions | undefined,
+): Promise<ExploreSubagentRuntimeResult> {
+  const chain = resolveAgentProfileModelChain(profile);
+  // 父 turn 显式下发的 modelOverride 优先级最高（临时 turn 模型不允许被 profile 链改写）。
+  if (!chain || runOptions?.modelOverride) {
+    return options.runExploreAgent(request, runOptions);
+  }
+
+  // executeWithModelChain 只返回成败与归因，child 结果由这两个闭包写入 holder。
+  const execution: { result?: ExploreSubagentRuntimeResult } = {};
+  const result = await executeWithModelChain(
+    chain,
+    async (selection) => {
+      execution.result = await options.runExploreAgent(request, {
+        ...runOptions,
+        modelOverride: { background: "deny", selection },
+      });
+    },
+    async () => {
+      // 主 Agent 兜底必须落在父模型，而不是 profile 的单模型：剥离 profile 的
+      // modelChain/modelSelection 后，child 选型解析会退回父会话模型（见 subagent.ts 的
+      // resolveSubagentSelection）。只剥离模型字段，工具/权限/prompt 等 profile 事实保持不变。
+      //
+      // 展开会立刻求值 request.background getter 并把结果固化成数据属性，破坏
+      // “每次读取都反映 registry 当前后台状态”的约定；这里显式重新声明 getter 转发回原对象。
+      const fallbackRequest: ExploreSubagentRuntimeRequest = {
+        ...request,
+        profile: withoutProfileModelIntent(profile),
+        get background() {
+          return request.background;
+        },
+      };
+      execution.result = await options.runExploreAgent(fallbackRequest, runOptions);
+    },
+  );
+  const completed = execution.result;
+  if (result.success && completed) return completed;
+
+  throw (
+    result.error ??
+    createCoreError(CoreErrorType.ToolExecutionFailed, "Subagent model chain failed", {
+      context: {
+        agentType: request.agentType,
+        fallbacks: chain.fallbacks.length,
+        retryCount: chain.retryCount,
+      },
+      recoverable: true,
+    })
+  );
+}
+
+/** 剥离 profile 的模型意图（模型链与单模型），用于主 Agent 兜底时恢复父模型继承。 */
+function withoutProfileModelIntent(profile: AgentProfile): AgentProfile {
+  const { modelChain: _modelChain, modelSelection: _modelSelection, ...rest } = profile;
+  return rest;
 }
 
 function createSubagentActivityWatchdog(options: {
@@ -2137,6 +2207,17 @@ function resolveAllowedTools(
     baseTools.push("Skill");
   }
   return filterSubagentChildToolNames(baseTools, profile.disallowedTools);
+}
+
+/**
+ * SubagentSpawned 事件里展示的模型标签。
+ *
+ * 模型链存在时展示 primary（链上第一个尝试的模型），否则回退到单模型选择；
+ * 两者都没有时返回 undefined，让事件省略该字段而不是伪造模型身份。
+ */
+function formatProfileModelLabel(profile: AgentProfile): string | undefined {
+  const selection = resolveAgentProfileModelSelection(profile);
+  return selection ? `${selection.providerId}/${selection.modelId}` : undefined;
 }
 
 async function writeTextFile(path: string, content: string): Promise<void> {

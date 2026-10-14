@@ -1,4 +1,5 @@
 import { parseAgentFrontmatter, splitMarkdownFrontmatter } from "./subagent-profile-frontmatter.js";
+import { parseSubagentMarkdownChain } from "./subagent-markdown-chain-parser.js";
 import { parseSubagentMarkdownSelection } from "./subagent-markdown-selection.js";
 import type { AgentPermissionMode } from "./subagents-types.js";
 import type {
@@ -57,6 +58,9 @@ export function parseAgentProfileFromMarkdown(input: {
   }
 
   const modelSelection = parseSubagentMarkdownSelection(frontmatter);
+  // 模型链与单模型选择可以并存；执行期由 modelChain 优先（见 core 的 profile 解析）。
+  // 过去只解析 modelSelection，frontmatter 里写的 modelChain 会被静默丢弃。
+  const modelChain = parseSubagentMarkdownChain(frontmatter);
   const color = normalizeColor(scalarString(frontmatter.color));
   const parsedPermissionMode = normalizePermissionMode(scalarString(frontmatter.permissionMode));
   // 修复原因：项目级 subagent markdown 属于仓库输入，不能通过 frontmatter 把
@@ -91,6 +95,7 @@ export function parseAgentProfileFromMarkdown(input: {
       systemPrompt: parsed.body.trim(),
       ...(input.path ? { path: input.path } : {}),
       ...(modelSelection ? { modelSelection } : {}),
+      ...(modelChain ? { modelChain } : {}),
       ...(color ? { color } : {}),
       ...(permissionMode ? { permissionMode } : {}),
       ...(maxTurns ? { maxTurns } : {}),

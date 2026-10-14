@@ -1,4 +1,4 @@
-# ZCode
+# ZCode（二开增强版）
 
 <div align="center">
   <img src="public/logo/icons/1024x1024.png" alt="ZCode" width="128" height="128" />
@@ -11,12 +11,65 @@
   简体中文 | <a href="README.en.md">English</a>
 </p>
 
+> **本仓库是 ZCode 的二开增强版**，基于 [zai-org/ZCode](https://github.com/zai-org/ZCode) 进行二次开发，增加了以下增强功能：
 
+## ✨ 二开增强功能
+
+### 1. 子智能体多模型链支持
+
+- **多模型绑定**：每个子智能体支持绑定最多 3 个模型（1 个主模型 + 2 个备用模型）
+- **独立思考等级**：每个模型可以单独设置思考等级（reasoningLevel）
+- **智能回退**：按顺序执行，主模型失败 5 次后自动切换到备用模型
+- **主 Agent 兜底**：所有模型都失败时，自动回退到主 Agent 继续执行
+
+**配置示例**（Markdown frontmatter）：
+
+```yaml
+---
+name: my-agent
+description: 我的自定义子智能体
+modelChain:
+  primary:
+    providerId: zai
+    modelId: glm-4.6
+    reasoningLevel: high
+  fallbacks:
+    - providerId: openai
+      modelId: gpt-5
+      reasoningLevel: medium
+    - providerId: anthropic
+      modelId: claude-4
+      reasoningLevel: low
+  retryCount: 5
+---
+```
+
+### 2. 模型自动获取
+
+- **自动获取上游模型列表**：支持从 OpenAI、Anthropic、Z.AI 等 Provider 自动获取模型列表
+- **参数自动识别**：自动识别模型的 contextWindow、maxOutputTokens、reasoningLevel 等参数
+- **一键添加**：在模型设置页面一键添加获取到的模型
+
+### 3. GitHub Actions 自动同步与发版
+
+- **自动同步上游**：每小时检测上游仓库更新，自动合并并应用二开补丁
+- **自动构建发版**：推送后自动构建多平台安装包（Windows、macOS、Linux）并发版
+- **冲突自动通知**：合并冲突时自动创建 Issue 通知
+
+### 4. 自定义更新源
+
+- **更新源切换**：客户端更新检测源已切换为本仓库的 GitHub Releases
+- **环境变量覆盖**：支持通过 `ZCODE_UPDATE_FEED_URL` 环境变量自定义更新源
+
+---
+
+## 原版说明
 
 ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent。本仓库包含客户端、后端服务、共享 UI，以及 Agent CLI 与运行时源码。
 
 ## 更新
 
+- 2026-10-14：二开增强版 v3.15.2 发布，添加子智能体多模型链、模型自动获取、GitHub Actions 自动同步等功能。
 - 2026-10-10：更新至 ZCode v3.15.1 版本。
 - 2026-9-23：更新至 ZCode v3.14.3 版本。
 

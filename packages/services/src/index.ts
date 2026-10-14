@@ -17,6 +17,8 @@ export {
   type AccountRequestAuthResolver,
 } from "./model-provider/accountRequestAuthService.js";
 export { IProviderProvisioningTargetService } from "./model-provider/providerProvisioning.js";
+// 模型自动获取与参数解析只依赖全局 fetch 与类型定义，Renderer / Web 可直接调用。
+export * from "./model-provider/index.js";
 export {
   collectServiceMemoryDiagnostics,
   memoryDiagnosticsRegistry,

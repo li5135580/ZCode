@@ -31,9 +31,12 @@ export function parseSubagentMarkdownChain(
     }
   }
 
-  // 解析重试次数
-  const retryCount = 
-    typeof chain.retryCount === "number" && chain.retryCount > 0
+  // 解析重试次数：与 subagentModelChainSchema 保持同一约束（正整数），
+  // 非整数（如 2.5）或非正值一律回退默认值 5，避免解析结果无法通过 Schema 校验。
+  const retryCount =
+    typeof chain.retryCount === "number" &&
+    Number.isInteger(chain.retryCount) &&
+    chain.retryCount > 0
       ? chain.retryCount
       : 5;
 

@@ -1,6 +1,8 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   createAgentStateId,
+  formatSubagentMarkdownChain,
+  parseSubagentMarkdownChain,
   parseSubagentMarkdownSelection,
   formatSubagentMarkdownModel,
   type AgentColor,
@@ -71,6 +73,9 @@ export function parseSubagentMarkdown(
 
   const source = input.scope === "built-in" ? "built-in" : "user";
   const modelSelection = parseSubagentMarkdownSelection(frontmatter);
+  // 模型链是可选的多模型回退配置；primary 缺失或非法时整体视为未配置，
+  // 由调用方回退到 modelSelection，不能让坏链把已有单模型配置顶掉。
+  const modelChain = parseSubagentMarkdownChain(frontmatter);
   const color = normalizeEnum(frontmatter.color, VALID_COLORS);
   const permissionMode = normalizeEnum(frontmatter.permissionMode, VALID_PERMISSION_MODES);
   const maxTurns = normalizePositiveInteger(frontmatter.maxTurns);
@@ -89,6 +94,7 @@ export function parseSubagentMarkdown(
       systemPrompt: parsed.body.trim(),
       ...(color ? { color } : {}),
       ...(modelSelection ? { modelSelection } : {}),
+      ...(modelChain ? { modelChain } : {}),
       ...(tools ? { tools } : {}),
       ...(disallowedTools ? { disallowedTools } : {}),
       ...(skills ? { skills } : {}),
@@ -119,6 +125,7 @@ export function serializeSubagentMarkdown(config: SubAgentConfig): string {
     appendScalar(frontmatterLines, "model", formatSubagentMarkdownModel(config.modelSelection));
     appendScalar(frontmatterLines, "thoughtLevel", config.modelSelection.options?.reasoningLevel);
   }
+  appendModelChain(frontmatterLines, config.modelChain);
   appendList(frontmatterLines, "tools", config.tools);
   appendList(frontmatterLines, "disallowedTools", config.disallowedTools);
   appendList(frontmatterLines, "skills", config.skills);
@@ -172,6 +179,9 @@ function parseRuntimeCompatibleFrontmatter(frontmatter: string): Record<string, 
     ...yamlValues,
     ...looseValues,
     ...(Array.isArray(yamlValues.mcpServers) ? { mcpServers: yamlValues.mcpServers } : {}),
+    // 模型链是嵌套 mapping，loose 解析器只把它读成空数组；必须保留 YAML 结果，
+    // 否则设置页读不到已写入的模型链，保存时还会把整块配置抹掉。
+    ...(isObjectRecord(yamlValues.modelChain) ? { modelChain: yamlValues.modelChain } : {}),
   };
 }
 
@@ -397,6 +407,24 @@ function appendUnknownList(
 
 function isStringArray(values: readonly unknown[]): values is readonly string[] {
   return values.every((value) => typeof value === "string");
+}
+
+/**
+ * 写入嵌套的 modelChain 块。
+ *
+ * frontmatter 需要的是 `modelChain:` 下的嵌套 mapping，不能用 appendList 平铺；
+ * 这里复用 shared 的格式化结果再走 YAML 序列化，保证写入格式与解析器约定一致。
+ */
+function appendModelChain(
+  lines: string[],
+  chain: SubAgentConfig["modelChain"],
+): void {
+  if (!chain) return;
+  const serialized = stringifyYaml(
+    { modelChain: formatSubagentMarkdownChain(chain) },
+    { lineWidth: 0 },
+  ).trimEnd();
+  lines.push(...serialized.split("\n"));
 }
 
 function formatYamlScalar(value: string): string {

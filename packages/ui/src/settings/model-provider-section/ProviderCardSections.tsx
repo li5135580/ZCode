@@ -12,7 +12,7 @@ import type {
   ProviderSettingsFormModel,
 } from "@/lib/providerSettingsFormTypes.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
-import type { ProviderApiType } from "@zcode/provider";
+import { isApiKeyAccess, type ProviderApiType } from "@zcode/provider";
 import {
   TID_MODEL_PROVIDER_ADD_MODEL_BUTTON,
   TID_MODEL_PROVIDER_BASE_URL_INPUT,
@@ -36,6 +36,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useServices } from "@/hooks/useServices.js";
 import { TECHNICAL_INPUT_ATTRIBUTES } from "@/lib/technicalInputAttributes.js";
 import { ApiKeyInput } from "./ApiKeyInput.js";
+import { FetchModelsButton } from "./FetchModelsButton.js";
 import { ModelRowInput } from "./ProviderFormControls.js";
 import { PresetProviderApiKeyBanner } from "./PresetProviderApiKeyBanner.js";
 import { type ProviderModelDraftValues } from "@/settings/model-provider-section/ProviderModelMetadata.js";
@@ -355,6 +356,9 @@ export function ProviderModelsSection({
   providerName,
   providerEnabled = true,
   providerAccess,
+  providerApiFormat,
+  providerBaseUrl,
+  providerApiKey,
   models,
   onTestModel,
   onModelCommit,
@@ -368,6 +372,12 @@ export function ProviderModelsSection({
   providerName?: string;
   providerEnabled?: boolean;
   providerAccess?: ProviderConfigObject["access"];
+  /** 当前草稿的 API 形态，用于自动获取模型列表时选择接口。 */
+  providerApiFormat?: ProviderApiType;
+  /** 当前草稿的 Base URL；未保存的编辑也应能被自动获取复用。 */
+  providerBaseUrl?: string;
+  /** 当前草稿的 API Key；未保存的编辑也应能被自动获取复用。 */
+  providerApiKey?: string;
   models: ProviderSettingsFormModel[];
   onTestModel?: (model: string) => Promise<ModelConnectivityResult>;
   onModelCommit: (
@@ -470,6 +480,10 @@ export function ProviderModelsSection({
         id: `settings.modelProvider.modelMetadata.invalid.${addDraftErrorField}`,
       })
     : null;
+  // 账号类 Provider 没有可复用的 API Key，模型列表接口也无从鉴权；只在 API Key 供应商上提供自动获取。
+  const apiKeyAccess = isApiKeyAccess(providerAccess) ? providerAccess : null;
+  // 优先使用连接区的未保存草稿：新建 Provider 保存前 access.apiKey 还是空的。
+  const apiKey = providerApiKey ?? apiKeyAccess?.apiKey ?? "";
 
   return (
     <div>
@@ -477,17 +491,29 @@ export function ProviderModelsSection({
         <span className="text-ui-base text-foreground-subtle">
           {intl.formatMessage({ id: "settings.modelProvider.models" })}
         </span>
-        <Button
-          type="button"
-          variant="secondary"
-          size="default"
-          className="rounded-lg"
-          data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
-          onClick={openAddDialog}
-        >
-          <Plus data-icon="inline-start" aria-hidden="true" />
-          {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {apiKeyAccess ? (
+            <FetchModelsButton
+              apiKind={providerApiFormat}
+              baseUrl={providerBaseUrl}
+              apiKey={apiKey}
+              disabled={!apiKey.trim()}
+              existingModelIds={models.map((model) => model.modelId)}
+              onAddModel={onAddModel}
+            />
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="default"
+            className="rounded-lg"
+            data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
+            onClick={openAddDialog}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
+          </Button>
+        </div>
       </div>
       {models.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-input-border bg-input">

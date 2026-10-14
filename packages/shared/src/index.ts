@@ -328,6 +328,10 @@ export * from "./subagent-runtime-config.js";
 
 export * from "./subagent-profile.js";
 export * from "./subagent-model-chain.js";
+// 模型链的 Markdown frontmatter 解析 / 序列化与 Subagent 存储层共用同一份实现，
+// 必须从包入口导出，避免调用方各自复制 YAML 规则。
+export * from "./subagent-markdown-chain-parser.js";
+export * from "./subagent-markdown-chain-formatter.js";
 export { parseAgentProfileFromMarkdown } from "./subagent-profile-parser.js";
 
 export * from "./localTtft.js";

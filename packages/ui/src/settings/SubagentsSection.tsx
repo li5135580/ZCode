@@ -16,6 +16,7 @@ import {
   type BuiltInSubagentName,
   type ModelSelection,
   type SubAgentConfig,
+  type SubagentModelChain,
 } from "@zcode/shared";
 import type { ModelSelectionView } from "@zcode/services";
 import { Button } from "@/components/ui/button.js";
@@ -59,6 +60,12 @@ import {
   SubagentReasoningField,
   type SubagentReasoningFieldState,
 } from "@/settings/SubagentReasoningField.js";
+import {
+  DEFAULT_SUBAGENT_MODEL_CHAIN_RETRY_COUNT,
+  SubagentModelChainEditor,
+  type SubagentModelChainEditorValue,
+} from "@/settings/SubagentModelChainEditor.js";
+import { SubagentModelChainBadge } from "@/settings/SubagentModelChainBadge.js";
 import { refreshLoadedSubagentsStoreForWorkspace } from "@/store/subagentsStore.js";
 import {
   PluginScopeMenu,
@@ -116,6 +123,8 @@ export interface SubagentFormInitialState {
   color: AgentColor;
   model: string;
   thoughtLevel?: string;
+  /** 多模型链草稿；undefined 表示该子智能体未配置模型链，沿用单模型选择器 */
+  modelChain?: SubagentModelChainEditorValue;
   injectAgentsMd: boolean;
   inheritAllTools: boolean;
   selectedTools: string[];
@@ -215,6 +224,64 @@ function toSubagentModelSelection(
 
 export type SubagentThoughtOptionState = SubagentReasoningFieldState;
 
+/**
+ * 已持久化模型链 → 编辑器受控值。
+ *
+ * 编辑器要求 fallbacks 数组始终存在，且 primary 允许暂缺；这里做一次浅拷贝，
+ * 避免表单直接改写到 agents 列表里的对象。
+ */
+export function toSubagentModelChainEditorValue(
+  chain: SubagentModelChain | undefined,
+): SubagentModelChainEditorValue | undefined {
+  if (!chain) {
+    return undefined;
+  }
+  return {
+    primary: chain.primary,
+    fallbacks: [...chain.fallbacks],
+    retryCount: chain.retryCount,
+  };
+}
+
+/**
+ * 编辑器受控值 → 可持久化模型链。
+ *
+ * 主模型未选完整时整条链视为「未配置」（schema 要求 primary 必填，落盘会被拒），
+ * 备用模型里的空占位槽位同样丢弃，避免写出 providerId/modelId 为空的选择。
+ */
+export function toPersistedSubagentModelChain(
+  value: SubagentModelChainEditorValue | undefined,
+): SubagentModelChain | undefined {
+  if (!value || !hasModelIdentity(value.primary)) {
+    return undefined;
+  }
+  return {
+    primary: normalizeSubagentModelSelection(value.primary),
+    fallbacks: value.fallbacks.filter(hasModelIdentity).map(normalizeSubagentModelSelection),
+    retryCount:
+      Number.isInteger(value.retryCount) && value.retryCount > 0
+        ? value.retryCount
+        : DEFAULT_SUBAGENT_MODEL_CHAIN_RETRY_COUNT,
+  };
+}
+
+/** 判断一个模型选择是否已填好 provider/model 身份；空占位槽位不参与持久化。 */
+function hasModelIdentity(
+  selection: ModelSelection | undefined,
+): selection is ModelSelection {
+  return Boolean(selection?.providerId?.trim() && selection?.modelId?.trim());
+}
+
+/** 去除模型选择首尾空白，避免把带空格的脏值写进 frontmatter。 */
+function normalizeSubagentModelSelection(selection: ModelSelection): ModelSelection {
+  const reasoningLevel = selection.options?.reasoningLevel?.trim();
+  return {
+    providerId: selection.providerId.trim(),
+    modelId: selection.modelId.trim(),
+    ...(reasoningLevel ? { options: { reasoningLevel } } : {}),
+  };
+}
+
 export function resolveSubagentThoughtOptionState(params: {
   model: string;
   modelAvailable: boolean;
@@ -299,6 +366,7 @@ export function createSubagentFormInitialState(
     | "description"
     | "color"
     | "modelSelection"
+    | "modelChain"
     | "tools"
     | "systemPrompt"
     | "injectAgentsMd"
@@ -310,6 +378,7 @@ export function createSubagentFormInitialState(
     color: initial?.color ?? "yellow",
     model: toSubagentModelValue(initial?.modelSelection),
     thoughtLevel: initial?.modelSelection?.options?.reasoningLevel,
+    modelChain: toSubagentModelChainEditorValue(initial?.modelChain),
     injectAgentsMd: initial?.injectAgentsMd ?? true,
     inheritAllTools: initial?.tools === undefined || initial.tools.length === 0,
     selectedTools: getKnownTools(initial?.tools),
@@ -532,6 +601,7 @@ function AgentListRow({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="truncate text-ui-base font-medium text-foreground">{displayName}</span>
           {showModelBadge ? <AgentBadge>{modelLabel}</AgentBadge> : null}
+          {agent.modelChain ? <SubagentModelChainBadge chain={agent.modelChain} /> : null}
           <AgentBadge>{toolsLabel}</AgentBadge>
         </div>
         <p className="mt-0.5 line-clamp-2 text-ui-sm text-foreground-subtle">
@@ -827,6 +897,9 @@ function SubagentForm({
   const [color, setColor] = useState<AgentColor>(initialFormState.color);
   const [model, setModel] = useState(initialFormState.model);
   const [thoughtLevel, setThoughtLevel] = useState(initialFormState.thoughtLevel);
+  const [modelChain, setModelChain] = useState<SubagentModelChainEditorValue | undefined>(
+    initialFormState.modelChain,
+  );
   const [injectAgentsMd, setInjectAgentsMd] = useState(initialFormState.injectAgentsMd);
   const [inheritAllTools, setInheritAllTools] = useState(initialFormState.inheritAllTools);
   const [selectedTools, setSelectedTools] = useState<string[]>(initialFormState.selectedTools);
@@ -835,6 +908,9 @@ function SubagentForm({
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [modelChainError, setModelChainError] = useState<string | null>(null);
+  // 未配置过模型链的历史 agent 默认关闭，保证原有单模型编辑路径完全不变。
+  const [modelChainEnabled, setModelChainEnabled] = useState(Boolean(initialFormState.modelChain));
   const inheritModelLabel = intl.formatMessage({
     id: "settings.subagents.model.inherit",
   });
@@ -890,6 +966,21 @@ function SubagentForm({
     !isSubagentThoughtLevelAvailable(thoughtLevelState, thoughtLevel),
   );
   const trimmedName = name.trim();
+  // 模型链草稿：启用时按需初始化（主模型沿用当前单模型选择），关闭时保持原值以便再次打开。
+  const modelChainDraft = useMemo<SubagentModelChainEditorValue>(() => {
+    if (modelChain) {
+      return modelChain;
+    }
+    const selection = toSubagentModelSelection(persistedModel, thoughtLevel);
+    return {
+      primary: selection,
+      fallbacks: [],
+      retryCount: DEFAULT_SUBAGENT_MODEL_CHAIN_RETRY_COUNT,
+    };
+  }, [modelChain, persistedModel, thoughtLevel]);
+  const persistedModelChain = modelChainEnabled
+    ? toPersistedSubagentModelChain(modelChainDraft)
+    : undefined;
   const canSave = Boolean(
     trimmedName.length >= 3 &&
     trimmedName.length <= 50 &&
@@ -897,9 +988,22 @@ function SubagentForm({
     description.trim() &&
     systemPrompt.trim() &&
     modelAvailable &&
-    !thoughtLevelInvalid,
+    !thoughtLevelInvalid &&
+    // 启用模型链后主模型必填，否则写盘会被 schema 拒绝。
+    (!modelChainEnabled || persistedModelChain),
   );
   const selectedColorIndex = Math.max(0, AGENT_COLORS.indexOf(color));
+
+  const handleModelChainEnabledChange = useCallback(
+    (enabled: boolean) => {
+      setModelChainEnabled(enabled);
+      setModelChainError(null);
+      if (!enabled) {
+        setModelChain(undefined);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (previousInitialFormStateKeyRef.current === initialFormStateKey) {
@@ -915,6 +1019,8 @@ function SubagentForm({
     setColor(nextInitialState.color);
     setModel(nextInitialState.model);
     setThoughtLevel(nextInitialState.thoughtLevel);
+    setModelChain(nextInitialState.modelChain);
+    setModelChainEnabled(Boolean(nextInitialState.modelChain));
     setInjectAgentsMd(nextInitialState.injectAgentsMd);
     setInheritAllTools(nextInitialState.inheritAllTools);
     setSelectedTools(nextInitialState.selectedTools);
@@ -923,6 +1029,7 @@ function SubagentForm({
     setDescriptionError(null);
     setPromptError(null);
     setModelError(null);
+    setModelChainError(null);
   }, [initial, initialFormStateKey]);
 
   const validate = (): boolean => {
@@ -980,6 +1087,17 @@ function SubagentForm({
     if (thoughtLevelInvalid) {
       valid = false;
     }
+    // 模型链的主模型是 schema 必填项；启用后未选完整必须阻止保存。
+    if (modelChainEnabled && !toPersistedSubagentModelChain(modelChainDraft)) {
+      setModelChainError(
+        intl.formatMessage({
+          id: "settings.subagents.form.validation.modelChainPrimaryRequired",
+        }),
+      );
+      valid = false;
+    } else {
+      setModelChainError(null);
+    }
     return valid;
   };
 
@@ -1016,6 +1134,9 @@ function SubagentForm({
       color,
       injectAgentsMd,
       ...(selection ? { modelSelection: selection } : {}),
+      // 关闭模型链时省略该字段：service 层按整份 config 重写 frontmatter，
+      // 传 undefined 才能把已删除的模型链从 Markdown 中清掉。
+      ...(persistedModelChain ? { modelChain: persistedModelChain } : {}),
       tools: inheritAllTools
         ? undefined
         : mergeTools(selectedTools, initialFormState.preservedTools),
@@ -1135,6 +1256,40 @@ function SubagentForm({
             </p>
           ) : null}
         </div>
+      </div>
+
+      {/* 模型链是单模型选择器之上的可选多模型回退配置；关闭时完全沿用原有单模型行为。 */}
+      <div className="space-y-3 rounded-xl border border-border p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <p className="text-ui-base font-medium text-foreground">
+              {intl.formatMessage({ id: "settings.subagents.modelChain.title" })}
+            </p>
+            <p className="text-ui-sm text-foreground-subtle">
+              {intl.formatMessage({ id: "settings.subagents.modelChain.description" })}
+            </p>
+          </div>
+          <Switch
+            checked={modelChainEnabled}
+            onCheckedChange={handleModelChainEnabledChange}
+            disabled={saving}
+            aria-label={intl.formatMessage({ id: "settings.subagents.modelChain.title" })}
+          />
+        </div>
+        {modelChainEnabled ? (
+          <SubagentModelChainEditor
+            value={modelChainDraft}
+            onChange={setModelChain}
+            disabled={saving}
+            modelGroups={modelSelectGroups}
+            modelSelectionView={modelSelectionView}
+            modelSelectionLoading={modelSelectionLoading}
+            onManageModels={onManageModels}
+          />
+        ) : null}
+        {modelChainError ? (
+          <p className="text-ui-base text-destructive">{modelChainError}</p>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">

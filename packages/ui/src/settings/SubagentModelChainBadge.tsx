@@ -7,6 +7,7 @@
 import type { SubagentModelChain } from "@zcode/shared";
 import { Badge } from "@/components/ui/badge.js";
 import { cn } from "@/components/lib/utils.js";
+import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
 export interface SubagentModelChainBadgeProps {
   /** 模型链（完整配置，primary 必须有值） */
@@ -15,15 +16,16 @@ export interface SubagentModelChainBadgeProps {
   className?: string;
 }
 
-export function SubagentModelChainBadge({
-  chain,
-  className,
-}: SubagentModelChainBadgeProps) {
+export function SubagentModelChainBadge({ chain, className }: SubagentModelChainBadgeProps) {
+  const { intl } = useZCodeIntl();
   const totalModels = 1 + chain.fallbacks.length;
 
   return (
-    <Badge variant="secondary" className={cn("text-xs", className)}>
-      {totalModels} 个模型
+    <Badge variant="secondary" className={cn("text-ui-sm", className)}>
+      {intl.formatMessage(
+        { id: "settings.subagents.modelChain.modelCount" },
+        { count: String(totalModels) },
+      )}
     </Badge>
   );
 }

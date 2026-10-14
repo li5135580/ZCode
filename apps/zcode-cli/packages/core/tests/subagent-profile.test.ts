@@ -6,6 +6,8 @@ import {
   isBuiltInExploreAgentProfile,
   normalizeAgentProfiles,
   parseAgentProfileFromMarkdown,
+  resolveAgentProfileModelChain,
+  resolveAgentProfileModelSelection,
 } from "../src/subagent/profile.js";
 
 describe("subagent profile Markdown parser", () => {
@@ -408,5 +410,84 @@ Review carefully.`,
     expect(prompt).toContain("Tools: Read, Bash, WebFetch, WebSearch, TodoWrite");
     expect(prompt).not.toContain("Glob");
     expect(prompt).not.toContain("Grep");
+  });
+});
+
+describe("subagent profile modelChain 解析与优先级", () => {
+  const chainFrontmatter = `---
+name: reviewer
+description: Review changes
+modelChain:
+  primary:
+    providerId: zai
+    modelId: glm-4.6
+    reasoningLevel: high
+  fallbacks:
+    - providerId: openai
+      modelId: gpt-5
+      reasoningLevel: medium
+    - providerId: anthropic
+      modelId: claude-4
+  retryCount: 3
+model: custom-openai/legacy
+thoughtLevel: low
+---
+Review carefully.`;
+
+  it("从 frontmatter 解析完整模型链（含 fallbacks 与 retryCount）", () => {
+    const result = parseAgentProfileFromMarkdown({ source: "user", content: chainFrontmatter });
+
+    expect(result.diagnostic).toBeUndefined();
+    expect(result.profile?.modelChain).toEqual({
+      primary: { providerId: "zai", modelId: "glm-4.6", options: { reasoningLevel: "high" } },
+      fallbacks: [
+        { providerId: "openai", modelId: "gpt-5", options: { reasoningLevel: "medium" } },
+        { providerId: "anthropic", modelId: "claude-4" },
+      ],
+      retryCount: 3,
+    });
+  });
+
+  it("modelChain 优先于单模型选择，单模型作为回退保留", () => {
+    const profile = parseAgentProfileFromMarkdown({
+      source: "user",
+      content: chainFrontmatter,
+    }).profile!;
+
+    // 链上第一个模型就是执行选型；单模型选择仍保留在 profile 上作为兜底意图。
+    expect(resolveAgentProfileModelSelection(profile)).toEqual(profile.modelChain!.primary);
+    expect(profile.modelSelection).toEqual({
+      providerId: "custom-openai",
+      modelId: "legacy",
+      options: { reasoningLevel: "low" },
+    });
+    expect(resolveAgentProfileModelChain(profile)).toBe(profile.modelChain);
+  });
+
+  it("没有 modelChain 时保持单模型行为", () => {
+    const profile = parseAgentProfileFromMarkdown({
+      source: "user",
+      content: `---
+name: reviewer
+description: Review changes
+model: custom-openai/legacy
+thoughtLevel: high
+---`,
+    }).profile!;
+
+    expect(resolveAgentProfileModelChain(profile)).toBeUndefined();
+    expect(resolveAgentProfileModelSelection(profile)).toEqual(profile.modelSelection);
+  });
+
+  it("modelChain 与单模型都缺失时不伪造选型", () => {
+    const profile = parseAgentProfileFromMarkdown({
+      source: "user",
+      content: `---
+name: reviewer
+description: Review changes
+---`,
+    }).profile!;
+
+    expect(resolveAgentProfileModelSelection(profile)).toBeUndefined();
   });
 });

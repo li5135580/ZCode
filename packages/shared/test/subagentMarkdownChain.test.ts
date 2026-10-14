@@ -5,6 +5,7 @@ import {
   modelChainToYaml,
 } from "../src/subagent-markdown-chain-formatter.js";
 import type { SubagentModelChain } from "../src/subagent-model-chain.js";
+import { subagentModelChainSchema } from "../src/subagent-model-chain.js";
 
 const sampleChain: SubagentModelChain = {
   primary: { providerId: "zai", modelId: "glm-4.6", options: { reasoningLevel: "high" } },
@@ -46,7 +47,9 @@ describe("Subagent modelChain Markdown frontmatter 解析", () => {
     }
   });
   it("重试次数缺失或非法时回退默认 5", () => {
-    for (const retryCount of [undefined, 0, -3, "5"]) {
+    // 非整数（2.5 / NaN）与小数同样非法：schema 是 .int().positive()，
+    // 解析结果必须能通过 subagentModelChainSchema 校验。
+    for (const retryCount of [undefined, 0, -3, "5", 2.5, Number.NaN]) {
       expect(
         parseSubagentMarkdownChain({
           modelChain: {
@@ -55,6 +58,17 @@ describe("Subagent modelChain Markdown frontmatter 解析", () => {
           },
         }),
       ).toEqual({ primary: { providerId: "zai", modelId: "glm-4.6" }, fallbacks: [], retryCount: 5 });
+    }
+  });
+  it("解析结果始终满足 subagentModelChainSchema 的整数约束", () => {
+    for (const retryCount of [2.5, 0.5, Number.NaN, 3, undefined]) {
+      const parsed = parseSubagentMarkdownChain({
+        modelChain: {
+          primary: { providerId: "zai", modelId: "glm-4.6" },
+          retryCount,
+        },
+      });
+      expect(subagentModelChainSchema.safeParse(parsed).success).toBe(true);
     }
   });
   it("备用模型最多保留 2 个，且跳过格式非法的项", () => {

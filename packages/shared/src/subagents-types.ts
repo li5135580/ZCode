@@ -1,5 +1,6 @@
 import type { ZCodeProvider } from "./zcode-task-types-core.js";
 import { modelSelectionSchema, type ModelSelection } from "./model-selection.js";
+import type { SubagentModelChain } from "./subagent-model-chain.js";
 
 export type AgentScope = "built-in" | "workspace" | "user";
 
@@ -53,6 +54,8 @@ export interface AgentSummary {
   systemPrompt: string;
   color?: AgentColor;
   modelSelection?: ModelSelection;
+  /** 多模型链（存在时优先于 modelSelection） */
+  modelChain?: SubagentModelChain;
   defaultModelSelection?: ModelSelection;
   modelSelectionOverride?: ModelSelection;
   tools?: string[];
@@ -100,6 +103,8 @@ export interface SubAgentConfig {
   systemPrompt: string;
   color?: AgentColor;
   modelSelection?: ModelSelection;
+  /** 多模型链（存在时优先于 modelSelection） */
+  modelChain?: SubagentModelChain;
   tools?: string[];
   disallowedTools?: string[];
   injectAgentsMd?: boolean;

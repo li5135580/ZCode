@@ -32,7 +32,8 @@ type FormatMessage = (
 export interface PhasePillRenderers {
   nameOf: (pill: TimelinePill) => string;
   pillProps: (pill: TimelinePill) => Parameters<typeof WorkflowAgentPill>[0];
-  renderPill: (pill: TimelinePill) => JSX.Element;
+  // React 19 移除了全局 JSX 命名空间，必须显式经 React 命名空间引用元素类型。
+  renderPill: (pill: TimelinePill) => React.JSX.Element;
 }
 
 export function phasePillRenderers({
