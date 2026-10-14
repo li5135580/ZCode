@@ -44,7 +44,7 @@ jobs:
           pnpm --version
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+        run: pnpm install --fetch-retries=5 --fetch-timeout=120000
 
       - name: Print tool versions
         run: |
