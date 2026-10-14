@@ -1,0 +1,1834 @@
+From 1582b2df8e2b92ac109fa31f113c88d7f1bccf10 Mon Sep 17 00:00:00 2001
+From: li5135580 <434602499@qq.com>
+Date: Wed, 14 Oct 2026 16:38:56 +0800
+Subject: [PATCH] =?UTF-8?q?feat:=20=E5=AD=90=E6=99=BA=E8=83=BD=E4=BD=93?=
+ =?UTF-8?q?=E5=A4=9A=E6=A8=A1=E5=9E=8B=E9=93=BE=E6=94=AF=E6=8C=81=20+=20?=
+ =?UTF-8?q?=E6=A8=A1=E5=9E=8B=E8=87=AA=E5=8A=A8=E8=8E=B7=E5=8F=96=20+=20Gi?=
+ =?UTF-8?q?tHub=20Actions=20=E8=87=AA=E5=8A=A8=E5=90=8C=E6=AD=A5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .github/workflows/build-release.yml           |  82 ++++
+ .github/workflows/sync-upstream.yml           | 107 +++++
+ .../subagent/model-chain-failure-detector.ts  | 165 ++++++++
+ packages/desktop/src/main/autoUpdater.ts      |   4 +-
+ .../src/main/manifestUpdateProvider.ts        |  11 +-
+ .../test/manifestUpdateProvider.test.ts       |  33 +-
+ .../model-provider/model-fetcher-service.ts   | 161 ++++++++
+ .../model-parameter-resolver.ts               | 130 ++++++
+ packages/shared/src/index.ts                  |   1 +
+ .../src/subagent-markdown-chain-formatter.ts  |  63 +++
+ .../src/subagent-markdown-chain-parser.ts     |  74 ++++
+ packages/shared/src/subagent-model-chain.ts   |  32 ++
+ .../src/subagent-profile-frontmatter.ts       |  97 ++++-
+ packages/shared/src/subagent-profile.ts       |   7 +
+ packages/shared/src/zcodeEndpoint.ts          |   5 +
+ .../shared/test/subagentMarkdownChain.test.ts | 153 ++++++++
+ .../src/settings/SubagentModelChainBadge.tsx  |  29 ++
+ .../src/settings/SubagentModelChainEditor.tsx | 369 ++++++++++++++++++
+ patches/README.md                             |  28 ++
+ 19 files changed, 1544 insertions(+), 7 deletions(-)
+ create mode 100644 .github/workflows/build-release.yml
+ create mode 100644 .github/workflows/sync-upstream.yml
+ create mode 100644 apps/zcode-cli/packages/core/src/subagent/model-chain-failure-detector.ts
+ create mode 100644 packages/services/src/model-provider/model-fetcher-service.ts
+ create mode 100644 packages/services/src/model-provider/model-parameter-resolver.ts
+ create mode 100644 packages/shared/src/subagent-markdown-chain-formatter.ts
+ create mode 100644 packages/shared/src/subagent-markdown-chain-parser.ts
+ create mode 100644 packages/shared/src/subagent-model-chain.ts
+ create mode 100644 packages/shared/test/subagentMarkdownChain.test.ts
+ create mode 100644 packages/ui/src/settings/SubagentModelChainBadge.tsx
+ create mode 100644 packages/ui/src/settings/SubagentModelChainEditor.tsx
+ create mode 100644 patches/README.md
+
+diff --git a/.github/workflows/build-release.yml b/.github/workflows/build-release.yml
+new file mode 100644
+index 0000000..7994547
+--- /dev/null
++++ b/.github/workflows/build-release.yml
+@@ -0,0 +1,82 @@
++name: Build and Release
++
++on:
++  push:
++    branches: [main]
++    tags: ['v*']
++  workflow_dispatch:
++
++permissions:
++  contents: write
++
++jobs:
++  build:
++    strategy:
++      matrix:
++        include:
++          - os: windows-latest
++            target: win
++          - os: macos-latest
++            target: mac
++          - os: ubuntu-latest
++            target: linux
++    runs-on: ${{ matrix.os }}
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Setup Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: '24'
++
++      - name: Install pnpm
++        uses: pnpm/action-setup@v2
++        with:
++          version: 10
++
++      - name: Install dependencies
++        run: pnpm install
++
++      - name: Build installer
++        # 桌面安装包由 packages/desktop/scripts/bundle.mjs 产出（内部调用 electron-builder），
++        # 输出到 packages/desktop/dist/。显式指定目标 OS/架构，避免默认的 mac/arm64。
++        # 注意：不要用根目录的 `pnpm build:zcode`，它只产出 dist/zcode/ 运行时 tar 包，
++        # 且缺少 ZCODE_DIST_BASE_URL 时会直接失败，不产出桌面安装包。
++        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
++        env:
++          ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
++
++      - name: Upload artifacts
++        uses: actions/upload-artifact@v4
++        with:
++          name: zcode-${{ matrix.os }}
++          path: |
++            packages/desktop/dist/*.exe
++            packages/desktop/dist/*.dmg
++            packages/desktop/dist/*.deb
++            packages/desktop/dist/*.AppImage
++          retention-days: 7
++
++  release:
++    needs: build
++    runs-on: ubuntu-latest
++    if: startsWith(github.ref, 'refs/tags/v')
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Download artifacts
++        uses: actions/download-artifact@v4
++        with:
++          path: artifacts
++
++      - name: Create Release
++        uses: softprops/action-gh-release@v1
++        with:
++          files: |
++            artifacts/**/*.exe
++            artifacts/**/*.dmg
++            artifacts/**/*.deb
++            artifacts/**/*.AppImage
++          generate_release_notes: true
+\ No newline at end of file
+diff --git a/.github/workflows/sync-upstream.yml b/.github/workflows/sync-upstream.yml
+new file mode 100644
+index 0000000..f16b513
+--- /dev/null
++++ b/.github/workflows/sync-upstream.yml
+@@ -0,0 +1,107 @@
++name: Sync Upstream
++
++on:
++  schedule:
++    - cron: '0 * * * *'  # 每小时检测
++  workflow_dispatch:      # 支持手动触发
++
++permissions:
++  contents: write
++  issues: write
++
++jobs:
++  sync:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++          token: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Setup Git
++        run: |
++          git config user.name "github-actions[bot]"
++          git config user.email "github-actions[bot]@users.noreply.github.com"
++
++      - name: Add upstream remote
++        run: |
++          git remote add upstream https://github.com/zai-org/ZCode.git || true
++          git fetch upstream
++
++      - name: Check for updates
++        id: check
++        run: |
++          UPSTREAM_SHA=$(git rev-parse upstream/main)
++          CURRENT_SHA=$(git rev-parse HEAD)
++          echo "upstream_sha=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
++          echo "current_sha=$CURRENT_SHA" >> $GITHUB_OUTPUT
++          if [ "$UPSTREAM_SHA" == "$CURRENT_SHA" ]; then
++            echo "has_updates=false" >> $GITHUB_OUTPUT
++          else
++            echo "has_updates=true" >> $GITHUB_OUTPUT
++          fi
++
++      - name: Sync upstream
++        if: steps.check.outputs.has_updates == 'true'
++        run: |
++          # 备份二开补丁。只备份 patches/0NN-*.patch（二开补丁命名约定，
++          # 见 patches/README.md），避免误用 pnpm patchedDependencies 的依赖补丁
++          #（如 patches/vitest@*.patch、patches/@arms__*.patch）。
++          mkdir -p /tmp/custom-patches
++          if compgen -G "patches/0*.patch" > /dev/null 2>&1; then
++            cp patches/0*.patch /tmp/custom-patches/
++          fi
++
++          # 自动合并上游代码，保留本地历史与补丁文件。冲突时中止并退出，
++          # 由下方 failure() 步骤创建 Issue 通知人工处理。
++          git merge upstream/main --no-edit || {
++            echo "Merge conflict with upstream"
++            git merge --abort
++            exit 1
++          }
++
++          # 恢复并应用二开补丁（merge 快进时补丁文件可能被上游版本覆盖）
++          if compgen -G "/tmp/custom-patches/*.patch" > /dev/null 2>&1; then
++            for patch in /tmp/custom-patches/*.patch; do
++              echo "Applying $patch"
++              git apply "$patch" --3way || {
++                echo "Conflict applying $patch"
++                exit 1
++              }
++              # 补丁文件原样放回 patches/，供下次同步继续复用
++              mkdir -p patches
++              cp "$patch" "patches/$(basename "$patch")"
++            done
++          fi
++
++          # 提交变更并推送（非 force，避免覆盖他人/历史提交）
++          git add .
++          git commit -m "chore: sync upstream $(git rev-parse --short upstream/main)" || true
++          git push origin main
++
++      - name: Create issue on conflict
++        if: failure()
++        uses: actions/github-script@v7
++        with:
++          script: |
++            const owner = context.repo.owner;
++            const repo = context.repo.repo;
++            // 幂等创建 label，避免 labels 引用不存在导致 issues.create 返回 422
++            try {
++              await github.rest.issues.createLabel({
++                owner,
++                repo,
++                name: 'sync-conflict',
++                color: 'd73a4a',
++              });
++            } catch (error) {
++              if (error.status !== 422) throw error;
++            }
++            await github.rest.issues.create({
++              owner,
++              repo,
++              title: '⚠️ Upstream sync conflict detected',
++              body: 'Automatic sync failed due to merge conflicts. Please resolve manually.',
++              labels: ['sync-conflict'],
++            });
+\ No newline at end of file
+diff --git a/apps/zcode-cli/packages/core/src/subagent/model-chain-failure-detector.ts b/apps/zcode-cli/packages/core/src/subagent/model-chain-failure-detector.ts
+new file mode 100644
+index 0000000..5cf95e8
+--- /dev/null
++++ b/apps/zcode-cli/packages/core/src/subagent/model-chain-failure-detector.ts
+@@ -0,0 +1,165 @@
++/**
++ * 模型链失败类型
++ */
++export enum ModelChainFailureType {
++  /** API 错误（如 429、500） */
++  ApiError = "api_error",
++  /** 超时 */
++  Timeout = "timeout",
++  /** 内容审核 */
++  ContentFilter = "content_filter",
++  /** 网络错误 */
++  NetworkError = "network_error",
++  /** 配额不足 */
++  QuotaExceeded = "quota_exceeded",
++  /** 未知错误 */
++  Unknown = "unknown",
++}
++
++/**
++ * 失败判定结果
++ */
++export interface FailureDetectionResult {
++  isFailure: boolean;
++  type: ModelChainFailureType;
++  retryable: boolean;
++  message?: string;
++}
++
++/**
++ * 判定错误是否为失败
++ */
++export function detectFailure(error: unknown): FailureDetectionResult {
++  // 空错误不算失败
++  if (!error) {
++    return {
++      isFailure: false,
++      type: ModelChainFailureType.Unknown,
++      retryable: false,
++    };
++  }
++
++  // 网络错误
++  if (isNetworkError(error)) {
++    return {
++      isFailure: true,
++      type: ModelChainFailureType.NetworkError,
++      retryable: true,
++      message: getErrorMessage(error),
++    };
++  }
++
++  // 超时
++  if (isTimeoutError(error)) {
++    return {
++      isFailure: true,
++      type: ModelChainFailureType.Timeout,
++      retryable: true,
++      message: getErrorMessage(error),
++    };
++  }
++
++  // API 错误
++  if (isApiError(error)) {
++    const statusCode = getStatusCode(error);
++
++    // 内容审核
++    if (statusCode === 400 || statusCode === 422) {
++      return {
++        isFailure: true,
++        type: ModelChainFailureType.ContentFilter,
++        retryable: false,
++        message: getErrorMessage(error),
++      };
++    }
++
++    // 配额不足
++    if (statusCode === 429) {
++      return {
++        isFailure: true,
++        type: ModelChainFailureType.QuotaExceeded,
++        retryable: true,
++        message: getErrorMessage(error),
++      };
++    }
++
++    // 服务器错误
++    if (statusCode && statusCode >= 500) {
++      return {
++        isFailure: true,
++        type: ModelChainFailureType.ApiError,
++        retryable: true,
++        message: getErrorMessage(error),
++      };
++    }
++  }
++
++  // 未知错误
++  return {
++    isFailure: true,
++    type: ModelChainFailureType.Unknown,
++    retryable: true,
++    message: getErrorMessage(error),
++  };
++}
++
++/**
++ * 判断是否为网络错误
++ */
++function isNetworkError(error: unknown): boolean {
++  if (!(error instanceof Error)) return false;
++  const message = error.message.toLowerCase();
++  return (
++    message.includes("network") ||
++    message.includes("econnrefused") ||
++    message.includes("econnreset") ||
++    message.includes("etimedout") ||
++    message.includes("socket")
++  );
++}
++
++/**
++ * 判断是否为超时错误
++ */
++function isTimeoutError(error: unknown): boolean {
++  if (!(error instanceof Error)) return false;
++  const message = error.message.toLowerCase();
++  return message.includes("timeout") || message.includes("timed out");
++}
++
++/**
++ * 判断是否为 API 错误
++ */
++function isApiError(error: unknown): boolean {
++  if (!(error instanceof Error)) return false;
++  return "statusCode" in error || "status" in error;
++}
++
++/**
++ * 获取 HTTP 状态码
++ */
++function getStatusCode(error: unknown): number | undefined {
++  if (!(error instanceof Error)) return undefined;
++  if ("statusCode" in error && typeof error.statusCode === "number") {
++    return error.statusCode;
++  }
++  if ("status" in error && typeof error.status === "number") {
++    return error.status;
++  }
++  return undefined;
++}
++
++/**
++ * 获取错误消息
++ */
++function getErrorMessage(error: unknown): string {
++  if (error instanceof Error) return error.message;
++  return String(error);
++}
++
++/**
++ * 判断是否应该重试
++ */
++export function shouldRetry(result: FailureDetectionResult, retryCount: number): boolean {
++  return result.isFailure && result.retryable && retryCount > 0;
++}
+\ No newline at end of file
+diff --git a/packages/desktop/src/main/autoUpdater.ts b/packages/desktop/src/main/autoUpdater.ts
+index 6cc3ca9..f0426cc 100644
+--- a/packages/desktop/src/main/autoUpdater.ts
++++ b/packages/desktop/src/main/autoUpdater.ts
+@@ -8,6 +8,7 @@ import {
+   DEFAULT_LOCALE,
+   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
+   PlatformChannels,
++  UPDATE_FEED_URL_ENV,
+   ZCODE_VERSION,
+   desktopMenuMessageIds,
+   formatDesktopMenuMessage,
+@@ -25,7 +26,6 @@ import { ManifestUpdateProvider, getElectronReleasePlatform } from "./manifestUp
+ export const CHECK_FOR_UPDATE_MENU_ID = "check-for-update";
+ const AUTO_UPDATE_POLL_INTERVAL_MS = 15 * 60 * 1000;
+ const AUTO_UPDATE_VISIBLE_POLL_INTERVAL_MS = 2 * 60 * 1000;
+-const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
+ const UPDATE_FEED_URL_SWITCH = "--zcode-update-feed-url";
+ const DEV_AUTO_UPDATE_ENV = "ZCODE_AUTO_UPDATE_DEV";
+ const DEV_AUTO_UPDATE_SWITCH = "--zcode-auto-update-dev";
+@@ -735,6 +735,8 @@ export function resolveUpdateFeedSourceFromStartupConfig(
+ ): RuntimeUpdateFeedSource | undefined {
+   const argv = options.argv ?? process.argv;
+   const env = options.env ?? process.env;
++  // 更新源优先级：命令行参数 > 环境变量 > 默认值（默认值由
++  // manifestUpdateProvider 的 ELECTRON_MANIFEST_API_PATH 兜底，未设置时返回 undefined）。
+   const feedUrl = readSwitchValue(argv, UPDATE_FEED_URL_SWITCH) ?? env[UPDATE_FEED_URL_ENV]?.trim();
+   return feedUrl
+     ? {
+diff --git a/packages/desktop/src/main/manifestUpdateProvider.ts b/packages/desktop/src/main/manifestUpdateProvider.ts
+index 537a1e4..cd2c7e8 100644
+--- a/packages/desktop/src/main/manifestUpdateProvider.ts
++++ b/packages/desktop/src/main/manifestUpdateProvider.ts
+@@ -1,7 +1,9 @@
+ import { posix } from "node:path";
+ import type { CustomPublishOptions, PackageFileInfo } from "builder-util-runtime";
+ import {
++  DEFAULT_UPDATE_FEED_URL,
+   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
++  UPDATE_FEED_URL_ENV,
+   normalizeZCodeEndpointOrigin,
+   type ElectronReleaseChannel,
+ } from "@zcode/shared";
+@@ -19,7 +21,14 @@ import {
+ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Provider.js";
+ import { parse as parseYaml } from "yaml";
+ 
+-export const ELECTRON_MANIFEST_API_PATH = "/api/v1/releases/electron/manifest";
++// 二开仓库的默认更新源：GitHub Releases 上的 electron-builder latest.yml。
++// 优先级：autoUpdater 解析的命令行 `--zcode-update-feed-url` > 环境变量
++// `ZCODE_UPDATE_FEED_URL` > 该默认值。命令行/环境变量来源会在 getLatestVersion
++// 构建 manifest URL 前经 options.manifestUrl 透传，这里只兜底默认值。
++const GITHUB_RELEASES_MANIFEST_URL = DEFAULT_UPDATE_FEED_URL;
++
++export const ELECTRON_MANIFEST_API_PATH =
++  process.env[UPDATE_FEED_URL_ENV]?.trim() || GITHUB_RELEASES_MANIFEST_URL;
+ 
+ const MANIFEST_ACCEPT_HEADER = "application/x-yaml,text/yaml,text/plain,*/*";
+ 
+diff --git a/packages/desktop/test/manifestUpdateProvider.test.ts b/packages/desktop/test/manifestUpdateProvider.test.ts
+index dc1acaa..dc29067 100644
+--- a/packages/desktop/test/manifestUpdateProvider.test.ts
++++ b/packages/desktop/test/manifestUpdateProvider.test.ts
+@@ -7,8 +7,9 @@ import {
+   NsisUpdater,
+ } from "electron-updater";
+ import { findFile } from "electron-updater/out/providers/Provider.js";
+-import { describe, expect, it } from "vitest";
++import { describe, expect, it, vi } from "vitest";
+ import {
++  ELECTRON_MANIFEST_API_PATH,
+   buildElectronManifestUrl,
+   getElectronReleasePlatform,
+   ManifestUpdateProvider,
+@@ -22,7 +23,7 @@ describe("ManifestUpdateProvider helpers", () => {
+     expect(getElectronReleasePlatform("linux", "arm64")).toBe("linux-aarch64");
+   });
+ 
+-  it("builds the server manifest URL with platform, device_mid, and numeric channel", () => {
++  it("未指定 manifestUrl 时默认走更新源常量（GitHub Releases latest.yml），并附加平台与通道参数", () => {
+     const url = buildElectronManifestUrl({
+       endpointOrigin: "https://zcode.example.test/base/path",
+       platform: "darwin-aarch64",
+@@ -30,13 +31,37 @@ describe("ManifestUpdateProvider helpers", () => {
+       channel: "preview",
+     });
+ 
+-    expect(url.origin).toBe("https://zcode.example.test");
+-    expect(url.pathname).toBe("/api/v1/releases/electron/manifest");
++    // 默认值随 ELECTRON_MANIFEST_API_PATH 解析（默认 GitHub Releases；可用 ZCODE_UPDATE_FEED_URL 覆盖）。
++    expect(url.origin).toBe(new URL(ELECTRON_MANIFEST_API_PATH).origin);
++    expect(url.pathname).toBe(new URL(ELECTRON_MANIFEST_API_PATH).pathname);
+     expect(url.searchParams.get("platform")).toBe("darwin-aarch64");
+     expect(url.searchParams.get("device_mid")).toBe("mid-1");
+     expect(url.searchParams.get("channel")).toBe("3");
+   });
+ 
++  it("更新源默认指向 GitHub Releases latest.yml，并可用 ZCODE_UPDATE_FEED_URL 覆盖", async () => {
++    vi.resetModules();
++
++    delete process.env.ZCODE_UPDATE_FEED_URL;
++    const defaultModule = await import(
++      "../src/main/manifestUpdateProvider.js"
++    ) as typeof import("@desktop/main/manifestUpdateProvider.js");
++    expect(defaultModule.ELECTRON_MANIFEST_API_PATH).toBe(
++      "https://github.com/li5135580/ZCode/releases/latest/download/latest.yml",
++    );
++
++    process.env.ZCODE_UPDATE_FEED_URL = "https://override.example.test/latest.yml";
++    vi.resetModules();
++    const overriddenModule = (await import(
++      "../src/main/manifestUpdateProvider.js",
++    )) as typeof import("@desktop/main/manifestUpdateProvider.js");
++    expect(overriddenModule.ELECTRON_MANIFEST_API_PATH).toBe(
++      "https://override.example.test/latest.yml",
++    );
++
++    delete process.env.ZCODE_UPDATE_FEED_URL;
++  });
++
+   it("overrides existing manifest URL query with runtime platform, device, and channel", () => {
+     const url = buildElectronManifestUrl({
+       endpointOrigin: "https://zcode.example.test",
+diff --git a/packages/services/src/model-provider/model-fetcher-service.ts b/packages/services/src/model-provider/model-fetcher-service.ts
+new file mode 100644
+index 0000000..6ae281c
+--- /dev/null
++++ b/packages/services/src/model-provider/model-fetcher-service.ts
+@@ -0,0 +1,161 @@
++import type { ProviderApiType } from "@zcode/provider";
++
++/** 通过 API 或内置配置获取到的单个模型信息。未补齐的参数由 model-parameter-resolver 按优先级填充。 */
++export interface FetchedModelInfo {
++  /** 模型 ID，例如 "glm-5"、"claude-4-sonnet"。 */
++  modelId: string;
++  /** 上下文窗口大小（token 数）。 */
++  contextWindow?: number;
++  /** 最大输出 token 数。 */
++  maxOutputTokens?: number;
++  /** 输入格式能力。 */
++  inputFormat?: {
++    supportsText: boolean;
++    supportsImage: boolean;
++    supportsVideo: boolean;
++    supportsAudio: boolean;
++    supportsPdf: boolean;
++  };
++  /** 该模型支持的推理档位（reasoning level）。 */
++  reasoningLevels?: string[];
++  /** 信息来源：API 返回 / 内置配置匹配 / 默认配置。 */
++  source: "api" | "builtin" | "default";
++}
++
++export interface FetchModelsResult {
++  success: boolean;
++  models: FetchedModelInfo[];
++  error?: string;
++}
++
++/**
++ * 模型自动获取所需的 Provider 形状。
++ *
++ * 当前 @zcode/shared 的 ZCodeProvider 只是 "glm" 字符串字面量，不携带 API 形态与端点，
++ * 因此这里定义结构化输入：apiKind 对应 @zcode/provider 的 ProviderApiType，
++ * baseUrl 对应 ProviderApiConfig.baseUrl。可传入 ProviderApiConfig 派生对象或直接构造字面量。
++ */
++export interface ProviderModelFetcherInput {
++  /** Provider 的 API 类型；缺失或不在已知集合内时走内置配置匹配。 */
++  apiKind?: ProviderApiType | null;
++  /** API Base URL，例如 "https://api.z.ai/api/paas/v4"。 */
++  baseUrl?: string | null;
++}
++
++/**
++ * 从 Provider 获取模型列表。
++ *
++ * 规则：
++ * - OpenAI 兼容（chat-completions / responses）：调用 `GET {baseUrl}/models`。
++ * - Anthropic（messages）：Anthropic 未提供公共模型列表 API，返回内置模型列表。
++ * - 其他 / 未知类型：使用内置配置匹配。
++ *
++ * @param provider Provider 的 API 形状描述（apiKind + baseUrl）。
++ * @param apiKey 访问 Provider API 所需的密钥。
++ */
++export async function fetchProviderModels(
++  provider: ProviderModelFetcherInput,
++  apiKey: string,
++): Promise<FetchModelsResult> {
++  switch (provider.apiKind) {
++    case "openai-chat-completions":
++    case "openai-responses":
++      return fetchOpenAICompatibleModels(provider.baseUrl, apiKey);
++    case "anthropic-messages":
++      return fetchAnthropicModels(provider.baseUrl, apiKey);
++    default:
++      // 其他类型（含未配置 apiKind 的 Provider）使用内置配置匹配。
++      return fetchBuiltinModels(provider);
++  }
++}
++
++/**
++ * 获取 OpenAI 兼容 API 的模型列表。
++ * Z.AI / BigModel / OpenAI 等均兼容 `/models` 端点。
++ */
++async function fetchOpenAICompatibleModels(
++  baseUrl: string | null | undefined,
++  apiKey: string,
++): Promise<FetchModelsResult> {
++  if (!baseUrl) {
++    return {
++      success: false,
++      models: [],
++      error: "缺少 Base URL，无法从 OpenAI 兼容 API 获取模型列表",
++    };
++  }
++
++  try {
++    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
++      headers: {
++        Authorization: `Bearer ${apiKey}`,
++        "Content-Type": "application/json",
++      },
++    });
++
++    if (!response.ok) {
++      return {
++        success: false,
++        models: [],
++        error: `HTTP ${response.status}: ${response.statusText}`,
++      };
++    }
++
++    const payload = await response.json();
++    const list: unknown = isRecord(payload) ? payload.data : undefined;
++    if (!Array.isArray(list)) {
++      return {
++        success: false,
++        models: [],
++        error: "响应格式不符合预期：缺少 data 数组",
++      };
++    }
++
++    const models: FetchedModelInfo[] = list
++      .filter((item): item is { id: string } => isRecord(item) && typeof item.id === "string")
++      .map((item) => ({ modelId: item.id, source: "api" as const }));
++
++    return { success: true, models };
++  } catch (error) {
++    return {
++      success: false,
++      models: [],
++      error: error instanceof Error ? error.message : "Unknown error",
++    };
++  }
++}
++
++/**
++ * 获取 Anthropic 模型列表。
++ * Anthropic 目前没有公开的模型列表 API，返回内置列表兜底。
++ */
++async function fetchAnthropicModels(
++  _baseUrl: string | null | undefined,
++  _apiKey: string,
++): Promise<FetchModelsResult> {
++  const builtinModels: FetchedModelInfo[] = [
++    { modelId: "claude-4-opus", source: "builtin" },
++    { modelId: "claude-4-sonnet", source: "builtin" },
++    { modelId: "claude-4-haiku", source: "builtin" },
++    { modelId: "claude-3.5-sonnet", source: "builtin" },
++  ];
++  return { success: true, models: builtinModels };
++}
++
++/**
++ * 使用内置配置匹配模型。
++ * TODO: 从 zcode-builtin.json 读取该 Provider 的模板模型列表。
++ */
++async function fetchBuiltinModels(
++  _provider: ProviderModelFetcherInput,
++): Promise<FetchModelsResult> {
++  return {
++    success: true,
++    models: [],
++    error: "Builtin model list not implemented yet",
++  };
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return typeof value === "object" && value !== null && !Array.isArray(value);
++}
+\ No newline at end of file
+diff --git a/packages/services/src/model-provider/model-parameter-resolver.ts b/packages/services/src/model-provider/model-parameter-resolver.ts
+new file mode 100644
+index 0000000..3960028
+--- /dev/null
++++ b/packages/services/src/model-provider/model-parameter-resolver.ts
+@@ -0,0 +1,130 @@
++import type { FetchedModelInfo } from "./model-fetcher-service.js";
++
++/** 解析完成后模型参数的完整形态。 */
++export interface ResolvedModelConfig {
++  modelId: string;
++  contextWindow: number;
++  maxOutputTokens: number;
++  inputFormat: {
++    supportsText: boolean;
++    supportsImage: boolean;
++    supportsVideo: boolean;
++    supportsAudio: boolean;
++    supportsPdf: boolean;
++  };
++  reasoningLevels: string[];
++  defaultReasoningLevel?: string;
++}
++
++/** 缺省参数。在没有任何 API 元数据或内置匹配时使用。 */
++const DEFAULT_MODEL_CONFIG: ResolvedModelConfig = {
++  modelId: "",
++  contextWindow: 200000,
++  maxOutputTokens: 32000,
++  inputFormat: {
++    supportsText: true,
++    supportsImage: false,
++    supportsVideo: false,
++    supportsAudio: false,
++    supportsPdf: false,
++  },
++  reasoningLevels: ["disabled", "enabled"],
++};
++
++/**
++ * 解析模型参数。
++ *
++ * 优先级：API 返回 > 内置匹配 > 默认配置。
++ * 各字段独立合并，输入缺失的字段按优先级回退，避免可选字段被 `undefined` 覆盖默认值。
++ *
++ * @param modelInfo API 或内置来源返回的模型信息。
++ * @param builtinConfig 内置匹配得到的模型参数。
++ */
++export function resolveModelParameters(
++  modelInfo: FetchedModelInfo,
++  builtinConfig?: Partial<ResolvedModelConfig>,
++): ResolvedModelConfig {
++  return {
++    modelId: modelInfo.modelId,
++    contextWindow:
++      modelInfo.contextWindow ?? builtinConfig?.contextWindow ?? DEFAULT_MODEL_CONFIG.contextWindow,
++    maxOutputTokens:
++      modelInfo.maxOutputTokens ??
++      builtinConfig?.maxOutputTokens ??
++      DEFAULT_MODEL_CONFIG.maxOutputTokens,
++    inputFormat: {
++      supportsText:
++        modelInfo.inputFormat?.supportsText ??
++        builtinConfig?.inputFormat?.supportsText ??
++        DEFAULT_MODEL_CONFIG.inputFormat.supportsText,
++      supportsImage:
++        modelInfo.inputFormat?.supportsImage ??
++        builtinConfig?.inputFormat?.supportsImage ??
++        DEFAULT_MODEL_CONFIG.inputFormat.supportsImage,
++      supportsVideo:
++        modelInfo.inputFormat?.supportsVideo ??
++        builtinConfig?.inputFormat?.supportsVideo ??
++        DEFAULT_MODEL_CONFIG.inputFormat.supportsVideo,
++      supportsAudio:
++        modelInfo.inputFormat?.supportsAudio ??
++        builtinConfig?.inputFormat?.supportsAudio ??
++        DEFAULT_MODEL_CONFIG.inputFormat.supportsAudio,
++      supportsPdf:
++        modelInfo.inputFormat?.supportsPdf ??
++        builtinConfig?.inputFormat?.supportsPdf ??
++        DEFAULT_MODEL_CONFIG.inputFormat.supportsPdf,
++    },
++    reasoningLevels:
++      modelInfo.reasoningLevels ?? builtinConfig?.reasoningLevels ?? DEFAULT_MODEL_CONFIG.reasoningLevels,
++    defaultReasoningLevel: builtinConfig?.defaultReasoningLevel,
++  };
++}
++
++/**
++ * 根据模型 ID 推断参数（内置规则）。
++ * 命中则返回覆盖参数，未命中返回空对象，交由默认配置兜底。
++ */
++export function inferModelParameters(modelId: string): Partial<ResolvedModelConfig> {
++  const lowerModelId = modelId.toLowerCase();
++
++  // GLM 系列
++  if (lowerModelId.includes("glm-5.2")) {
++    return {
++      contextWindow: 1000000,
++      maxOutputTokens: 128000,
++      reasoningLevels: ["disabled", "high", "max"],
++    };
++  }
++  if (lowerModelId.includes("glm-5")) {
++    return {
++      contextWindow: 200000,
++      maxOutputTokens: 64000,
++      reasoningLevels: ["disabled", "enabled"],
++    };
++  }
++
++  // Claude 系列
++  if (lowerModelId.includes("claude-4")) {
++    return {
++      contextWindow: 200000,
++      maxOutputTokens: 64000,
++      inputFormat: {
++        supportsText: true,
++        supportsImage: true,
++        supportsVideo: false,
++        supportsAudio: false,
++        supportsPdf: true,
++      },
++    };
++  }
++
++  // GPT 系列
++  if (lowerModelId.includes("gpt-5")) {
++    return {
++      contextWindow: 400000,
++      maxOutputTokens: 128000,
++    };
++  }
++
++  return {};
++}
+\ No newline at end of file
+diff --git a/packages/shared/src/index.ts b/packages/shared/src/index.ts
+index f10fc48..199e137 100644
+--- a/packages/shared/src/index.ts
++++ b/packages/shared/src/index.ts
+@@ -327,6 +327,7 @@ export { bashOutputDisplaySchema } from "./bash-output-display.js";
+ export * from "./subagent-runtime-config.js";
+ 
+ export * from "./subagent-profile.js";
++export * from "./subagent-model-chain.js";
+ export { parseAgentProfileFromMarkdown } from "./subagent-profile-parser.js";
+ 
+ export * from "./localTtft.js";
+diff --git a/packages/shared/src/subagent-markdown-chain-formatter.ts b/packages/shared/src/subagent-markdown-chain-formatter.ts
+new file mode 100644
+index 0000000..dfa569d
+--- /dev/null
++++ b/packages/shared/src/subagent-markdown-chain-formatter.ts
+@@ -0,0 +1,63 @@
++import type { ModelSelection } from "./model-selection.js";
++import type { SubagentModelChain } from "./subagent-model-chain.js";
++
++/**
++ * 将模型链格式化为 YAML frontmatter 值
++ */
++export function formatSubagentMarkdownChain(chain: SubagentModelChain): Record<string, unknown> {
++  return {
++    primary: formatModelSelection(chain.primary),
++    fallbacks: chain.fallbacks.map(formatModelSelection),
++    retryCount: chain.retryCount,
++  };
++}
++
++/**
++ * 格式化单个模型选择
++ */
++function formatModelSelection(selection: ModelSelection): Record<string, unknown> {
++  const result: Record<string, unknown> = {
++    providerId: selection.providerId,
++    modelId: selection.modelId,
++  };
++
++  if (selection.options?.reasoningLevel) {
++    result.reasoningLevel = selection.options.reasoningLevel;
++  }
++
++  return result;
++}
++
++/**
++ * 将模型链转换为 YAML 字符串（用于 Markdown frontmatter）
++ */
++export function modelChainToYaml(chain: SubagentModelChain): string {
++  const data = formatSubagentMarkdownChain(chain);
++  return toYamlString(data, 0);
++}
++
++/**
++ * 简单的 YAML 序列化（仅支持本场景需要的格式）
++ */
++function toYamlString(data: unknown, indent: number): string {
++  const spaces = "  ".repeat(indent);
++  
++  if (Array.isArray(data)) {
++    return data
++      .map((item) => `${spaces}- ${toYamlString(item, indent + 1).trimStart()}`)
++      .join("\n");
++  }
++  
++  if (typeof data === "object" && data !== null) {
++    return Object.entries(data)
++      .map(([key, value]) => {
++        if (typeof value === "object" && value !== null) {
++          return `${spaces}${key}:\n${toYamlString(value, indent + 1)}`;
++        }
++        return `${spaces}${key}: ${value}`;
++      })
++      .join("\n");
++  }
++  
++  return String(data);
++}
+\ No newline at end of file
+diff --git a/packages/shared/src/subagent-markdown-chain-parser.ts b/packages/shared/src/subagent-markdown-chain-parser.ts
+new file mode 100644
+index 0000000..cddab19
+--- /dev/null
++++ b/packages/shared/src/subagent-markdown-chain-parser.ts
+@@ -0,0 +1,74 @@
++import type { ModelSelection } from "./model-selection.js";
++import type { SubagentModelChain } from "./subagent-model-chain.js";
++
++/**
++ * 从 frontmatter 解析模型链
++ */
++export function parseSubagentMarkdownChain(
++  frontmatter: Record<string, unknown>,
++): SubagentModelChain | undefined {
++  const chainData = frontmatter.modelChain;
++  if (!chainData || typeof chainData !== "object") {
++    return undefined;
++  }
++
++  const chain = chainData as Record<string, unknown>;
++  
++  // 解析主模型
++  const primary = parseModelSelection(chain.primary);
++  if (!primary) {
++    return undefined;
++  }
++
++  // 解析备用模型列表
++  const fallbacks: ModelSelection[] = [];
++  if (Array.isArray(chain.fallbacks)) {
++    for (const fallback of chain.fallbacks) {
++      const selection = parseModelSelection(fallback);
++      if (selection) {
++        fallbacks.push(selection);
++      }
++    }
++  }
++
++  // 解析重试次数
++  const retryCount = 
++    typeof chain.retryCount === "number" && chain.retryCount > 0
++      ? chain.retryCount
++      : 5;
++
++  return {
++    primary,
++    fallbacks: fallbacks.slice(0, 2), // 最多 2 个备用模型
++    retryCount,
++  };
++}
++
++/**
++ * 解析单个模型选择
++ */
++function parseModelSelection(data: unknown): ModelSelection | undefined {
++  if (!data || typeof data !== "object") {
++    return undefined;
++  }
++
++  const selection = data as Record<string, unknown>;
++  
++  if (typeof selection.providerId !== "string" || !selection.providerId.trim()) {
++    return undefined;
++  }
++  if (typeof selection.modelId !== "string" || !selection.modelId.trim()) {
++    return undefined;
++  }
++
++  const result: ModelSelection = {
++    providerId: selection.providerId.trim(),
++    modelId: selection.modelId.trim(),
++  };
++
++  if (typeof selection.reasoningLevel === "string" && selection.reasoningLevel.trim()) {
++    result.options = { reasoningLevel: selection.reasoningLevel.trim() };
++  }
++
++  return result;
++}
+\ No newline at end of file
+diff --git a/packages/shared/src/subagent-model-chain.ts b/packages/shared/src/subagent-model-chain.ts
+new file mode 100644
+index 0000000..6852598
+--- /dev/null
++++ b/packages/shared/src/subagent-model-chain.ts
+@@ -0,0 +1,32 @@
++import { modelSelectionSchema, type ModelSelection } from "./model-selection.js";
++import { z } from "zod";
++
++export interface SubagentModelChain {
++  /** 主模型（第一个尝试的模型） */
++  primary: ModelSelection;
++  /** 备用模型列表（最多 2 个，按顺序回退） */
++  fallbacks: ModelSelection[];
++  /** 每个模型的重试次数（默认 5） */
++  retryCount: number;
++}
++
++export const subagentModelChainSchema = z
++  .object({
++    primary: modelSelectionSchema,
++    fallbacks: z.array(modelSelectionSchema).max(2),
++    retryCount: z.number().int().positive().default(5),
++  })
++  .strict();
++
++export type SubagentModelChainInput = z.input<typeof subagentModelChainSchema>;
++
++/** 获取模型链中的所有模型（按执行顺序） */
++export function getModelChainSelections(chain: SubagentModelChain): ModelSelection[] {
++  return [chain.primary, ...chain.fallbacks];
++}
++
++/** 验证模型链是否有效 */
++export function validateModelChain(chain: unknown): SubagentModelChain | null {
++  const result = subagentModelChainSchema.safeParse(chain);
++  return result.success ? result.data : null;
++}
+diff --git a/packages/shared/src/subagent-profile-frontmatter.ts b/packages/shared/src/subagent-profile-frontmatter.ts
+index 1786cb3..5471ea1 100644
+--- a/packages/shared/src/subagent-profile-frontmatter.ts
++++ b/packages/shared/src/subagent-profile-frontmatter.ts
+@@ -50,7 +50,8 @@ function parseLooseFrontmatter(frontmatter: string): {
+   const lines = frontmatter.split(/\r?\n/u);
+   let pendingListKey: string | undefined;
+ 
+-  for (const rawLine of lines) {
++  for (let index = 0; index < lines.length; index++) {
++    const rawLine = lines[index]!;
+     const line = rawLine.trimEnd();
+     if (!line.trim() || line.trimStart().startsWith("#")) continue;
+ 
+@@ -85,12 +86,26 @@ function parseLooseFrontmatter(frontmatter: string): {
+     if (!keyValue) continue;
+     const key = keyValue[1]!;
+     const rawValue = keyValue[2] ?? "";
++
++    // 检测嵌套对象（如 modelChain:）
+     if (rawValue.trim() === "") {
++      // 检查下一行是否是缩进的块
++      const nextLine = lines[index + 1];
++      if (nextLine && /^\s+\S/u.test(nextLine)) {
++        // 解析嵌套块
++        const nestedResult = parseNestedBlock(lines, index + 1);
++        if (nestedResult) {
++          values[key] = nestedResult.value;
++          index = nestedResult.endIndex; // 跳过已处理的行
++          continue;
++        }
++      }
+       values[key] = [];
+       bareValueKeys.add(key);
+       pendingListKey = key;
+       continue;
+     }
++
+     if (key === "mcpServers" && hasUnquotedInlineMappingItem(rawValue)) {
+       invalidNestedListKeys.add(key);
+     }
+@@ -100,6 +115,86 @@ function parseLooseFrontmatter(frontmatter: string): {
+   return { bareValueKeys, invalidNestedListKeys, values };
+ }
+ 
++/**
++ * 解析嵌套块（如 modelChain: 下的内容）
++ * 返回解析后的值和结束行索引
++ */
++function parseNestedBlock(
++  lines: string[],
++  startIndex: number,
++): { value: unknown; endIndex: number } | null {
++  const result: Record<string, unknown> = {};
++  let currentIndex = startIndex;
++  let currentIndent: number | null = null;
++
++  while (currentIndex < lines.length) {
++    const rawLine = lines[currentIndex]!;
++    const line = rawLine.trimEnd();
++
++    // 空行或注释行跳过
++    if (!line.trim() || line.trimStart().startsWith("#")) {
++      currentIndex++;
++      continue;
++    }
++
++    // 计算缩进
++    const indent = rawLine.length - rawLine.trimStart().length;
++
++    // 如果缩进小于初始缩进，说明块结束
++    if (currentIndent !== null && indent < currentIndent) {
++      break;
++    }
++
++    // 设置初始缩进
++    if (currentIndent === null) {
++      currentIndent = indent;
++    }
++
++    // 如果缩进大于初始缩进，说明是更深层的嵌套（暂不支持，跳过）
++    if (indent > currentIndent) {
++      currentIndex++;
++      continue;
++    }
++
++    // 解析键值对
++    const keyValue = line.trim().match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
++    if (keyValue) {
++      const key = keyValue[1]!;
++      const rawValue = keyValue[2] ?? "";
++
++      // 检查是否有更深层的嵌套
++      if (rawValue.trim() === "") {
++        const nextLine = lines[currentIndex + 1];
++        if (nextLine && /^\s+\S/u.test(nextLine)) {
++          const nestedResult = parseNestedBlock(lines, currentIndex + 1);
++          if (nestedResult) {
++            result[key] = nestedResult.value;
++            currentIndex = nestedResult.endIndex + 1;
++            continue;
++          }
++        }
++        result[key] = [];
++      } else {
++        result[key] = parseScalarValue(rawValue);
++      }
++      currentIndex++;
++      continue;
++    }
++
++    // 解析列表项
++    const listMatch = line.trim().match(/^-\s+(.*)$/u);
++    if (listMatch) {
++      // 列表项暂不支持在嵌套块中，跳过
++      currentIndex++;
++      continue;
++    }
++
++    currentIndex++;
++  }
++
++  return Object.keys(result).length > 0 ? { value: result, endIndex: currentIndex - 1 } : null;
++}
++
+ function parseMcpServerNames(
+   value: unknown,
+   isConfigured: boolean,
+diff --git a/packages/shared/src/subagent-profile.ts b/packages/shared/src/subagent-profile.ts
+index a9bd6f3..6d24b42 100644
+--- a/packages/shared/src/subagent-profile.ts
++++ b/packages/shared/src/subagent-profile.ts
+@@ -1,6 +1,10 @@
+ import { z } from "zod";
+ import { modelSelectionSchema, type ModelSelection } from "./model-selection.js";
+ import type { AgentPermissionMode } from "./subagents-types.js";
++import {
++  subagentModelChainSchema,
++  type SubagentModelChain,
++} from "./subagent-model-chain.js";
+ 
+ export type AgentProfileSource = "built-in" | "project" | "user";
+ export type AgentMemoryScope = "user" | "project" | "local";
+@@ -15,6 +19,8 @@ export interface AgentProfile {
+   mcpServers?: readonly string[];
+   memory?: AgentMemoryScope;
+   modelSelection?: ModelSelection;
++  /** 多模型链（新功能，优先级高于 modelSelection） */
++  modelChain?: SubagentModelChain;
+   name: string;
+   path?: string;
+   permissionMode?: AgentPermissionMode;
+@@ -44,6 +50,7 @@ export const agentProfileSchema = z
+     systemPrompt: z.string(),
+     path: z.string().optional(),
+     modelSelection: modelSelectionSchema.optional(),
++    modelChain: subagentModelChainSchema.optional(),
+     background: z.boolean().optional(),
+     injectAgentsMd: z.boolean().optional(),
+     color: z
+diff --git a/packages/shared/src/zcodeEndpoint.ts b/packages/shared/src/zcodeEndpoint.ts
+index 361e9a5..b66721b 100644
+--- a/packages/shared/src/zcodeEndpoint.ts
++++ b/packages/shared/src/zcodeEndpoint.ts
+@@ -13,6 +13,11 @@ export const DEFAULT_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
+ export const TEST_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
+ export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/ws";
+ export const WEB_REMOTE_CONTROL_V4_MIN_APP_VERSION = "3.4.0";
++// 更新检测源默认指向二开仓库的 GitHub Releases（electron-builder latest.yml）；
++// 可通过环境变量 `ZCODE_UPDATE_FEED_URL` 覆盖，命令行 `--zcode-update-feed-url` 优先级更高。
++export const DEFAULT_UPDATE_FEED_URL =
++  "https://github.com/li5135580/ZCode/releases/latest/download/latest.yml";
++export const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
+ 
+ export interface BuildZCodeEndpointUrlsOptions {
+   appVersion?: string;
+diff --git a/packages/shared/test/subagentMarkdownChain.test.ts b/packages/shared/test/subagentMarkdownChain.test.ts
+new file mode 100644
+index 0000000..0e2d3e3
+--- /dev/null
++++ b/packages/shared/test/subagentMarkdownChain.test.ts
+@@ -0,0 +1,153 @@
++import { describe, expect, it } from "vitest";
++import { parseSubagentMarkdownChain } from "../src/subagent-markdown-chain-parser.js";
++import {
++  formatSubagentMarkdownChain,
++  modelChainToYaml,
++} from "../src/subagent-markdown-chain-formatter.js";
++import type { SubagentModelChain } from "../src/subagent-model-chain.js";
++
++const sampleChain: SubagentModelChain = {
++  primary: { providerId: "zai", modelId: "glm-4.6", options: { reasoningLevel: "high" } },
++  fallbacks: [
++    { providerId: "openai", modelId: "gpt-5", options: { reasoningLevel: "medium" } },
++    { providerId: "anthropic", modelId: "claude-4", options: { reasoningLevel: "low" } },
++  ],
++  retryCount: 5,
++};
++
++describe("Subagent modelChain Markdown frontmatter 解析", () => {
++  it("解析完整的 modelChain（主模型 + 备用们 + 重试次数）", () => {
++    expect(
++      parseSubagentMarkdownChain({
++        modelChain: {
++          primary: { providerId: "zai", modelId: "glm-4.6", reasoningLevel: "high" },
++          fallbacks: [
++            { providerId: "openai", modelId: "gpt-5", reasoningLevel: "medium" },
++            { providerId: "anthropic", modelId: "claude-4", reasoningLevel: "low" },
++          ],
++          retryCount: 5,
++        },
++      }),
++    ).toEqual(sampleChain);
++  });
++  it("modelChain 缺失、null、非对象时不返回模型链", () => {
++    for (const frontmatter of [
++      {},
++      { modelChain: null },
++      { modelChain: "zai/glm-4.6" },
++      { modelChain: ["zai/glm-4.6"] },
++    ]) {
++      expect(parseSubagentMarkdownChain(frontmatter)).toBeUndefined();
++    }
++  });
++  it("主模型缺失或非法时整体返回 undefined", () => {
++    for (const primary of [undefined, null, {}, { providerId: "zai" }, { modelId: "glm-4.6" }]) {
++      expect(parseSubagentMarkdownChain({ modelChain: { primary } })).toBeUndefined();
++    }
++  });
++  it("重试次数缺失或非法时回退默认 5", () => {
++    for (const retryCount of [undefined, 0, -3, "5"]) {
++      expect(
++        parseSubagentMarkdownChain({
++          modelChain: {
++            primary: { providerId: "zai", modelId: "glm-4.6" },
++            retryCount,
++          },
++        }),
++      ).toEqual({ primary: { providerId: "zai", modelId: "glm-4.6" }, fallbacks: [], retryCount: 5 });
++    }
++  });
++  it("备用模型最多保留 2 个，且跳过格式非法的项", () => {
++    expect(
++      parseSubagentMarkdownChain({
++        modelChain: {
++          primary: { providerId: "zai", modelId: "glm-4.6" },
++          fallbacks: [
++            { providerId: "openai", modelId: "gpt-5" },
++            { providerId: "bad", modelId: "" },
++            { providerId: "anthropic", modelId: "claude-4" },
++            { providerId: "deepseek", modelId: "r1" },
++          ],
++        },
++      }),
++    ).toEqual({
++      primary: { providerId: "zai", modelId: "glm-4.6" },
++      fallbacks: [
++        { providerId: "openai", modelId: "gpt-5" },
++        { providerId: "anthropic", modelId: "claude-4" },
++      ],
++      retryCount: 5,
++    });
++  });
++  it("providerId / modelId / reasoningLevel 的首尾空白被清理", () => {
++    expect(
++      parseSubagentMarkdownChain({
++        modelChain: {
++          primary: { providerId: "  zai  ", modelId: " glm-4.6 ", reasoningLevel: " high " },
++          fallbacks: [],
++        },
++      }),
++    ).toEqual({
++      primary: { providerId: "zai", modelId: "glm-4.6", options: { reasoningLevel: "high" } },
++      fallbacks: [],
++      retryCount: 5,
++    });
++  });
++  it("未提供 reasoningLevel 时不生成 options", () => {
++    expect(
++      parseSubagentMarkdownChain({
++        modelChain: { primary: { providerId: "zai", modelId: "glm-4.6" } },
++      }),
++    ).toEqual({ primary: { providerId: "zai", modelId: "glm-4.6" }, fallbacks: [], retryCount: 5 });
++  });
++});
++
++describe("Subagent modelChain Markdown frontmatter 序列化", () => {
++  it("格式化 principal / fallbacks / retryCount 为 frontmatter 值", () => {
++    expect(formatSubagentMarkdownChain(sampleChain)).toEqual({
++      primary: { providerId: "zai", modelId: "glm-4.6", reasoningLevel: "high" },
++      fallbacks: [
++        { providerId: "openai", modelId: "gpt-5", reasoningLevel: "medium" },
++        { providerId: "anthropic", modelId: "claude-4", reasoningLevel: "low" },
++      ],
++      retryCount: 5,
++    });
++  });
++  it("模型选择没有 reasoningLevel 时不输出该字段", () => {
++    expect(
++      formatSubagentMarkdownChain({
++        primary: { providerId: "zai", modelId: "glm-4.6" },
++        fallbacks: [],
++        retryCount: 3,
++      }),
++    ).toEqual({ primary: { providerId: "zai", modelId: "glm-4.6" }, fallbacks: [], retryCount: 3 });
++  });
++  it("输出与 frontmatter 示例一致的 YAML 文本", () => {
++    expect(modelChainToYaml(sampleChain)).toBe(
++      [
++        "primary:",
++        "  providerId: zai",
++        "  modelId: glm-4.6",
++        "  reasoningLevel: high",
++        "fallbacks:",
++        "  - providerId: openai",
++        "    modelId: gpt-5",
++        "    reasoningLevel: medium",
++        "  - providerId: anthropic",
++        "    modelId: claude-4",
++        "    reasoningLevel: low",
++        "retryCount: 5",
++      ].join("\n"),
++    );
++  });
++  it("序列化结果能被解析器还原", () => {
++    for (const chain of [
++      sampleChain,
++      { primary: { providerId: "zai", modelId: "glm-4.6" }, fallbacks: [], retryCount: 3 },
++    ]) {
++      expect(parseSubagentMarkdownChain({ modelChain: formatSubagentMarkdownChain(chain) })).toEqual(
++        chain,
++      );
++    }
++  });
++});
+\ No newline at end of file
+diff --git a/packages/ui/src/settings/SubagentModelChainBadge.tsx b/packages/ui/src/settings/SubagentModelChainBadge.tsx
+new file mode 100644
+index 0000000..e49b1f0
+--- /dev/null
++++ b/packages/ui/src/settings/SubagentModelChainBadge.tsx
+@@ -0,0 +1,29 @@
++/**
++ * 子智能体模型链信息徽标。
++ *
++ * 在子智能体列表中展示模型链的模型数量（主模型 + 备用模型），
++ * 例如「3 个模型」，让用户一眼识别该子智能体是否配置了多模型回退。
++ */
++import type { SubagentModelChain } from "@zcode/shared";
++import { Badge } from "@/components/ui/badge.js";
++import { cn } from "@/components/lib/utils.js";
++
++export interface SubagentModelChainBadgeProps {
++  /** 模型链（完整配置，primary 必须有值） */
++  chain: SubagentModelChain;
++  /** 附加到 Badge 的 className */
++  className?: string;
++}
++
++export function SubagentModelChainBadge({
++  chain,
++  className,
++}: SubagentModelChainBadgeProps) {
++  const totalModels = 1 + chain.fallbacks.length;
++
++  return (
++    <Badge variant="secondary" className={cn("text-xs", className)}>
++      {totalModels} 个模型
++    </Badge>
++  );
++}
+\ No newline at end of file
+diff --git a/packages/ui/src/settings/SubagentModelChainEditor.tsx b/packages/ui/src/settings/SubagentModelChainEditor.tsx
+new file mode 100644
+index 0000000..bb76442
+--- /dev/null
++++ b/packages/ui/src/settings/SubagentModelChainEditor.tsx
+@@ -0,0 +1,369 @@
++/**
++ * 子智能体模型链编辑器。
++ *
++ * 让用户为子智能体配置「主模型 + 备用模型（最多 2 个）+ 失败重试次数」的模型链。
++ * 主模型与每个备用模型都可以单独选择模型与思考等级（reasoning level）。
++ *
++ * 说明：真实的 ModelConfigSelect 是模型目录驱动的下拉菜单（modelGroups / normalizedValue /
++ * triggerLabel / onValueChange），没有 value/onChange/placeholder 的受控表单 API；
++ * 因此本组件额外接收模型目录数据（modelGroups、modelSelectionView、modelSelectionLoading），
++ * 与 SubagentsSection 的 SubagentForm 保持同一套选型接线。
++ */
++import { useCallback, useMemo, type ChangeEvent } from "react";
++import { GripVertical, Plus, Trash2 } from "lucide-react";
++import { completeNewModelSelection } from "@zcode/provider";
++import type { ModelSelection } from "@zcode/shared";
++import type { ModelSelectionView } from "@zcode/services";
++import { Button } from "@/components/ui/button.js";
++import { Input } from "@/components/ui/input.js";
++import { Label } from "@/components/ui/label.js";
++import {
++  ModelConfigSelect,
++  type ModelSelectFooterAction,
++  type ModelSelectGroup,
++} from "@/ModelConfigSelect.js";
++import {
++  SubagentReasoningField,
++  type SubagentReasoningFieldState,
++} from "@/settings/SubagentReasoningField.js";
++import {
++  isSubagentModelAvailable,
++  resolveSubagentThoughtOptionState,
++} from "@/settings/SubagentsSection.js";
++import { resolveModelDisplayName } from "@/lib/modelSelectionGroups.js";
++import { parseModelPickerValue } from "@/lib/zcodeSessionProjection.js";
++import { encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
++import { useZCodeIntl } from "@/i18n/IntlProvider.js";
++import { cn } from "@/components/lib/utils.js";
++
++/** 模型链编辑器维护的受控值；primary 允许暂缺，fallbacks 最多 2 个。 */
++export interface SubagentModelChainEditorValue {
++  /** 主模型（第一个尝试的模型） */
++  primary?: ModelSelection;
++  /** 备用模型列表（最多 2 个，按顺序回退） */
++  fallbacks: ModelSelection[];
++  /** 每个模型失败后的重试次数 */
++  retryCount: number;
++}
++
++export interface SubagentModelChainEditorProps {
++  /** 当前模型链值（受控） */
++  value: SubagentModelChainEditorValue;
++  /** 值变化回调（受控） */
++  onChange: (value: SubagentModelChainEditorValue) => void;
++  /** 禁用全部交互 */
++  disabled?: boolean;
++  /** 附加到根节点的 className */
++  className?: string;
++  /** 模型候选分组（ModelConfigSelect 的目录数据，来自 buildRegistryModelSelectGroups） */
++  modelGroups: readonly ModelSelectGroup[];
++  /** 模型选择视图，用于补齐思考档位默认值；未就绪时为 null */
++  modelSelectionView?: ModelSelectionView | null;
++  /** 模型目录是否仍在加载 */
++  modelSelectionLoading: boolean;
++  /** 「管理模型」入口；省略则不展示管理菜单项 */
++  onManageModels?: () => void;
++}
++
++/** 备用模型数量上限 */
++const MAX_FALLBACKS = 2;
++/** 目录内模型不参与锁定 */
++const MODEL_ITEM_NEVER_LOCKED = () => false;
++
++/** 判断一个 ModelSelection 是否已完整填好 provider/model 身份（空占位不算已选）。 */
++function hasModelIdentity(selection: ModelSelection | undefined): selection is ModelSelection {
++  return Boolean(selection?.providerId && selection?.modelId);
++}
++
++/**
++ * 单个模型槽位（主模型或某一个备用模型）的「模型选择 + 思考等级」控件。
++ *
++ * 复用 SubagentsSection 里 SubagentForm 的选型接线：ModelConfigSelect 负责选模型，
++ * SubagentReasoningField 负责展示/切换当前模型支持的思考档位。
++ */
++function SubagentModelSlot({
++  selection,
++  placeholder,
++  modelGroups,
++  modelSelectionView,
++  modelSelectionLoading,
++  disabled,
++  onChange,
++  onManageModels,
++  className,
++}: {
++  /** 当前槽位的模型选择；空对象占位会被当作「未选择」展示 */
++  selection: ModelSelection | undefined;
++  /** 未选择模型时触发器上展示的占位文案 */
++  placeholder: string;
++  modelGroups: readonly ModelSelectGroup[];
++  modelSelectionView?: ModelSelectionView | null;
++  modelSelectionLoading: boolean;
++  disabled: boolean;
++  /** 槽位选择变化；传入 undefined 表示清除 */
++  onChange: (selection: ModelSelection | undefined) => void;
++  onManageModels?: () => void;
++  className?: string;
++}) {
++  const { intl } = useZCodeIntl();
++  const hasSelection = hasModelIdentity(selection);
++  const pickerValue = hasSelection
++    ? encodeCustomModelValue(selection.providerId, selection.modelId)
++    : "";
++  const modelAvailable = isSubagentModelAvailable(
++    modelGroups,
++    pickerValue,
++    modelSelectionLoading,
++  );
++  const triggerLabel = pickerValue
++    ? (resolveModelDisplayName(modelGroups, pickerValue) ?? pickerValue)
++    : placeholder;
++  const thoughtLevelState: SubagentReasoningFieldState = resolveSubagentThoughtOptionState({
++    model: pickerValue,
++    modelAvailable,
++    modelSelectionView,
++    modelSelectionLoading,
++    thoughtLevel: selection?.options?.reasoningLevel,
++  });
++
++  const handleValueChange = useCallback(
++    (nextValue: string) => {
++      const parsed = parseModelPickerValue(nextValue);
++      // 选新模型时只采用目录给出的默认档位（模型不支持思考档位时为空），
++      // 避免把上一个模型的 reasoningLevel 错带到不支持的模型上。
++      const completed = modelSelectionView
++        ? completeNewModelSelection(modelSelectionView, parsed)
++        : undefined;
++      const reasoningLevel = completed?.options?.reasoningLevel;
++      onChange({
++        providerId: parsed.providerId,
++        modelId: parsed.modelId,
++        ...(reasoningLevel ? { options: { reasoningLevel } } : {}),
++      });
++    },
++    [modelSelectionView, onChange],
++  );
++
++  const handleClear = useCallback(() => {
++    onChange(undefined);
++  }, [onChange]);
++
++  const handleReasoningCommit = useCallback(
++    (reasoningLevel: string) => {
++      if (!hasModelIdentity(selection)) {
++        return;
++      }
++      if (reasoningLevel === selection.options?.reasoningLevel) {
++        return;
++      }
++      onChange({
++        providerId: selection.providerId,
++        modelId: selection.modelId,
++        ...(reasoningLevel ? { options: { reasoningLevel } } : {}),
++      });
++    },
++    [onChange, selection],
++  );
++
++  const footerActions = useMemo<ModelSelectFooterAction[]>(() => {
++    if (!pickerValue) {
++      return [];
++    }
++    return [
++      {
++        key: "subagent-model-chain:clear",
++        label: "清除模型",
++        onSelect: handleClear,
++      },
++    ];
++  }, [handleClear, pickerValue]);
++
++  return (
++    <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
++      <ModelConfigSelect
++        modelGroups={modelGroups}
++        normalizedValue={pickerValue}
++        triggerLabel={triggerLabel}
++        showManageModelsAction={Boolean(onManageModels)}
++        lockReasonMessage=""
++        isItemLocked={MODEL_ITEM_NEVER_LOCKED}
++        onValueChange={handleValueChange}
++        footerActions={footerActions}
++        manageModelsLabel={intl.formatMessage({
++          id: "chat.toolbar.model.manageModels",
++        })}
++        onManageModels={onManageModels}
++        contentSide="bottom"
++        contentAlign="start"
++        focusSelectorOnClose={null}
++        labelVisibilityClassName="inline-flex min-w-0"
++        triggerClassName="h-8 w-fit max-w-full min-w-0 justify-between rounded-lg border border-input-border bg-input bg-clip-border px-3 py-1.5 text-foreground hover:border-input-border-hover hover:bg-input focus-visible:border-input-border-focused focus-visible:bg-input-focused"
++        triggerLabelClassName="inline-flex min-w-0 truncate text-left"
++        disabled={disabled}
++      />
++      <SubagentReasoningField
++        intl={intl}
++        state={thoughtLevelState}
++        disabled={disabled}
++        labelVisibilityClassName="hidden sm:inline-flex"
++        onValueCommit={handleReasoningCommit}
++      />
++    </div>
++  );
++}
++
++/**
++ * 子智能体模型链编辑器：主模型 + 备用模型（最多 2 个）+ 失败重试次数。
++ *
++ * 所有变更通过受控的 onChange 上抛完整模型链值；本组件不持有内部状态。
++ * 模型候选与思考档位来自父级传入的模型目录数据。
++ */
++export function SubagentModelChainEditor({
++  value,
++  onChange,
++  disabled = false,
++  className,
++  modelGroups,
++  modelSelectionView,
++  modelSelectionLoading,
++  onManageModels,
++}: SubagentModelChainEditorProps) {
++  const handlePrimaryChange = useCallback(
++    (selection: ModelSelection | undefined) => {
++      onChange({ ...value, primary: selection });
++    },
++    [value, onChange],
++  );
++
++  const handleFallbackChange = useCallback(
++    (index: number, selection: ModelSelection | undefined) => {
++      const newFallbacks = [...value.fallbacks];
++      if (selection) {
++        newFallbacks[index] = selection;
++      } else {
++        newFallbacks.splice(index, 1);
++      }
++      onChange({ ...value, fallbacks: newFallbacks });
++    },
++    [value, onChange],
++  );
++
++  const handleAddFallback = useCallback(() => {
++    if (value.fallbacks.length < MAX_FALLBACKS) {
++      onChange({
++        ...value,
++        fallbacks: [...value.fallbacks, { providerId: "", modelId: "" }],
++      });
++    }
++  }, [value, onChange]);
++
++  const handleRemoveFallback = useCallback(
++    (index: number) => {
++      const newFallbacks = [...value.fallbacks];
++      newFallbacks.splice(index, 1);
++      onChange({ ...value, fallbacks: newFallbacks });
++    },
++    [value, onChange],
++  );
++
++  const handleRetryCountChange = useCallback(
++    (event: ChangeEvent<HTMLInputElement>) => {
++      const count = parseInt(event.target.value, 10);
++      if (!Number.isNaN(count) && count > 0) {
++        onChange({ ...value, retryCount: count });
++      }
++    },
++    [value, onChange],
++  );
++
++  return (
++    <div className={cn("space-y-4", className)}>
++      {/* 主模型 */}
++      <div className="space-y-2">
++        <Label>主模型</Label>
++        <SubagentModelSlot
++          selection={value.primary}
++          placeholder="选择主模型"
++          modelGroups={modelGroups}
++          modelSelectionView={modelSelectionView}
++          modelSelectionLoading={modelSelectionLoading}
++          disabled={disabled}
++          onChange={handlePrimaryChange}
++          onManageModels={onManageModels}
++        />
++        <p className="text-sm text-muted-foreground">首先尝试使用的模型</p>
++      </div>
++
++      {/* 备用模型列表 */}
++      <div className="space-y-2">
++        <div className="flex items-center justify-between">
++          <Label>备用模型（最多 {MAX_FALLBACKS} 个）</Label>
++          {value.fallbacks.length < MAX_FALLBACKS && (
++            <Button
++              type="button"
++              variant="outline"
++              size="sm"
++              onClick={handleAddFallback}
++              disabled={disabled}
++            >
++              <Plus className="h-4 w-4 mr-1" />
++              添加备用模型
++            </Button>
++          )}
++        </div>
++
++        {value.fallbacks.map((fallback, index) => (
++          <div
++            key={index}
++            className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50"
++          >
++            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
++            <div className="min-w-0 flex-1">
++              <SubagentModelSlot
++                selection={fallback}
++                placeholder={`备用模型 ${index + 1}`}
++                modelGroups={modelGroups}
++                modelSelectionView={modelSelectionView}
++                modelSelectionLoading={modelSelectionLoading}
++                disabled={disabled}
++                onChange={(selection) => handleFallbackChange(index, selection)}
++                onManageModels={onManageModels}
++              />
++            </div>
++            <Button
++              type="button"
++              variant="ghost"
++              size="sm"
++              onClick={() => handleRemoveFallback(index)}
++              disabled={disabled}
++            >
++              <Trash2 className="h-4 w-4" />
++            </Button>
++          </div>
++        ))}
++
++        {value.fallbacks.length === 0 && (
++          <p className="text-sm text-muted-foreground">主模型失败时将使用备用模型</p>
++        )}
++      </div>
++
++      {/* 重试次数 */}
++      <div className="space-y-2">
++        <Label htmlFor="retry-count">失败重试次数</Label>
++        <Input
++          id="retry-count"
++          type="number"
++          min={1}
++          max={10}
++          value={value.retryCount}
++          onChange={handleRetryCountChange}
++          disabled={disabled}
++          className="w-24"
++        />
++        <p className="text-sm text-muted-foreground">
++          每个模型失败 {value.retryCount} 次后切换到下一个模型
++        </p>
++      </div>
++    </div>
++  );
++}
+diff --git a/patches/README.md b/patches/README.md
+new file mode 100644
+index 0000000..d680f64
+--- /dev/null
++++ b/patches/README.md
+@@ -0,0 +1,28 @@
++# 二开补丁管理
++
++本目录存放二开修改的补丁文件，用于上游同步时自动应用。
++
++> 注意：本目录同时存放 pnpm `patchedDependencies` 引用的依赖补丁（如 `vitest@4.1.7.patch`、
++> `@arms__rum-electron@0.0.3.patch` 等，见根目录 `package.json` 的 `pnpm.patchedDependencies`）。
++> 这些依赖补丁作用于 `node_modules` 内的包，**不是** git 工作树补丁，不能用于 `git apply`。
++>
++> 为避免误用，二开补丁统一以 `0NN-` 命名（如 `001-*.patch`），`.github/workflows/sync-upstream.yml`
++> 只对 `patches/0*.patch` 执行 `git apply --3way`。
++
++## 使用方式
++
++1. 生成补丁：
++   ```bash
++   git diff upstream/main > patches/001-custom-changes.patch
++   ```
++
++2. 应用补丁（只应用二开补丁，避免误用 pnpm 依赖补丁）：
++   ```bash
++   git apply patches/0*.patch --3way
++   ```
++
++## 补丁列表
++
++- `001-subagent-model-chain.patch` - 子智能体多模型链支持
++- `002-model-auto-fetch.patch` - 模型自动获取功能
++- `003-update-source.patch` - 更新源修改
+\ No newline at end of file
+-- 
+2.55.0.windows.3
+

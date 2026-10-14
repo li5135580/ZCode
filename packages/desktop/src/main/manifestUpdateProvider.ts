@@ -221,7 +221,7 @@ export class ManifestUpdateProvider extends Provider<UpdateInfo> {
       deviceMid: this.options.deviceMid,
       channel: releaseChannel,
     });
-    this.resolveBaseUrl = new URL("/", manifestUrl);
+    this.resolveBaseUrl = new URL(".", manifestUrl);
     const releaseChannelApiValue = mapReleaseChannelToApiValue(releaseChannel);
 
     const raw = await this.httpRequest(manifestUrl, {
