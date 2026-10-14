@@ -39,11 +39,11 @@ jobs:
         with:
           node-version: '24.14.0'  # 精确锁定版本
 
-      - name: Install pnpm
-        run: npm install -g pnpm@10.33.2
-
-      - name: Verify pnpm installation
-        run: pnpm --version
+      - name: Enable corepack and install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.2 --activate
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
