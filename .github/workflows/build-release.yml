@@ -47,7 +47,7 @@ jobs:
           npm --version
 
       - name: Build installer with npm
-        run: npm run --filter @zcode/desktop bundle -- --os ${{ matrix.target }} --arch x64
+        run: npm run bundle --workspace=@zcode/desktop -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
