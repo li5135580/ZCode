@@ -17,11 +17,6 @@ jobs:
         include:
           - os: windows-latest
             target: win
-          # 暂时跳过 macOS 和 Linux，先确保 Windows 构建成功
-          # - os: macos-latest
-          #   target: mac
-          # - os: ubuntu-latest
-          #   target: linux
 
     runs-on: ${{ matrix.os }}
 
@@ -57,18 +52,26 @@ jobs:
           pnpm --version
           pnpm config get registry
 
-      - name: Build installer
+      - name: Prepare runtime assets
+        run: pnpm --filter @zcode/desktop run prepare:runtime-assets
+        env:
+          ZCODE_SKIP_REMOTE_ASSETS: "1"
+
+      - name: Build production bundles
+        run: pnpm --filter @zcode/desktop run build:no-runtime-assets
+        env:
+          ZCODE_ENV: "production"
+          ZCODE_PREVIEW_IDENTITY: "1"
+
+      - name: Verify renderer build output
         run: |
-          # 先执行 build（包含 prepare:runtime-assets）
-          pnpm --filter @zcode/desktop run build
-          # 检查 renderer 构建产物
           echo "=== Checking renderer build output ==="
-          ls -la packages/desktop/out/renderer/ || echo "out/renderer not found"
-          ls -la packages/desktop/out/renderer/*.html 2>/dev/null || echo "No HTML files in out/renderer"
-          ls -la packages/desktop/out/renderer/assets/ 2>/dev/null | head -5 || echo "No assets in out/renderer"
-          echo "=== Renderer check done ==="
-          # 再执行 bundle（跳过 prepare 和 build）
-          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+          ls -la packages/desktop/out/renderer/ || { echo "ERROR: out/renderer not found"; exit 1; }
+          ls -la packages/desktop/out/renderer/*.html 2>/dev/null || { echo "ERROR: No HTML files in out/renderer"; exit 1; }
+          echo "=== Renderer check passed ==="
+
+      - name: Bundle installer
+        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
@@ -76,7 +79,6 @@ jobs:
           ZCODE_SKIP_BUILD: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           DEBUG: electron-builder
-          # 连接生产后端，同时使用 Preview 身份（与官方版并存，不冲突）
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
 
