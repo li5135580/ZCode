@@ -58,6 +58,7 @@ jobs:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
       - name: Build production bundles
+        shell: bash
         run: |
           echo "=== Running tsup ==="
           cd packages/desktop && pnpm exec tsup
