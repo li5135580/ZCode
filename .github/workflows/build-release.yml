@@ -63,7 +63,7 @@ jobs:
           echo "=== Running tsup ==="
           cd packages/desktop && pnpm exec tsup
           echo "=== Running vite build ==="
-          cd packages/desktop && npx vite build --config vite.config.ts
+          cd packages/desktop && npx vite build --config vite.config.ts --outDir out/renderer
           echo "=== Build done ==="
           echo "=== Checking all possible renderer output locations ==="
           echo "--- packages/desktop/out/renderer ---"
