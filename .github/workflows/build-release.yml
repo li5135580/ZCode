@@ -57,6 +57,17 @@ jobs:
         env:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
+      - name: Build tsup bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Running tsup ==="
+          pnpm --dir packages/desktop exec tsup
+          echo "=== tsup done ==="
+        env:
+          ZCODE_ENV: "production"
+          ZCODE_PREVIEW_IDENTITY: "1"
+
       - name: Build vite renderer
         shell: bash
         run: |
@@ -80,37 +91,6 @@ jobs:
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
-
-      - name: Build tsup bundles
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Running tsup ==="
-          pnpm --dir packages/desktop exec tsup
-          echo "=== tsup done ==="
-        env:
-          ZCODE_ENV: "production"
-          ZCODE_PREVIEW_IDENTITY: "1"
-
-      - name: Verify renderer build output
-        shell: bash
-        run: |
-          echo "=== Checking renderer build output ==="
-          # 检查所有可能的位置
-          for dir in "packages/desktop/out/renderer" "out/renderer"; do
-            echo "--- Checking $dir ---"
-            if [ -d "$dir" ]; then
-              ls -la "$dir"
-              if ls "$dir"/*.html 1> /dev/null 2>&1; then
-                echo "FOUND HTML files in $dir"
-              else
-                echo "NO HTML files in $dir"
-              fi
-            else
-              echo "$dir not found"
-            fi
-          done
-          echo "=== Renderer check done ==="
 
       - name: Bundle installer
         run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
