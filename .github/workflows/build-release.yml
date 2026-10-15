@@ -60,21 +60,30 @@ jobs:
       - name: Build production bundles
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "=== Running tsup ==="
-          cd packages/desktop && pnpm exec tsup
+          pnpm --dir packages/desktop exec tsup
+
           echo "=== Running vite build ==="
-          cd packages/desktop && node ../../node_modules/vite/bin/vite.js build 2>&1 | tee /tmp/vite-build.log
-          VITE_EXIT_CODE=${PIPESTATUS[0]}
-          echo "=== Vite build exit code: $VITE_EXIT_CODE ==="
-          echo "=== Vite build output (last 50 lines) ==="
-          tail -50 /tmp/vite-build.log
-          echo "=== Checking renderer output ==="
-          ls -la packages/desktop/out/renderer/ 2>/dev/null || echo "packages/desktop/out/renderer not found"
-          ls -la out/renderer/ 2>/dev/null || echo "out/renderer (repo root) not found"
-          if [ $VITE_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Vite build failed with exit code $VITE_EXIT_CODE"
-            exit $VITE_EXIT_CODE
-          fi
+          pnpm --dir packages/desktop exec vite build --config vite.config.ts
+
+          echo "=== Verifying renderer output ==="
+          renderer_dir="packages/desktop/out/renderer"
+
+          test -d "$renderer_dir" || { echo "ERROR: $renderer_dir not found"; exit 1; }
+
+          for html in \
+            index.html \
+            resource-manager.html \
+            cua-permission-panel.html \
+            plugin-sandbox.html
+          do
+            test -s "$renderer_dir/$html" || { echo "ERROR: missing $renderer_dir/$html"; exit 1; }
+            echo "FOUND $renderer_dir/$html"
+          done
+
+          echo "=== Build and renderer verification passed ==="
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
