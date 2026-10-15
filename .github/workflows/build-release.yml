@@ -58,7 +58,12 @@ jobs:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
       - name: Build production bundles
-        run: pnpm --filter @zcode/desktop run build:no-runtime-assets
+        run: |
+          echo "=== Running tsup ==="
+          cd packages/desktop && pnpm exec tsup
+          echo "=== Running vite build ==="
+          cd packages/desktop && pnpm exec vite build
+          echo "=== Build done ==="
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
