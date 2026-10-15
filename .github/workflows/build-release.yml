@@ -57,12 +57,16 @@ jobs:
           pnpm config get registry
 
       - name: Build installer
-        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+        run: |
+          # 先执行 build（包含 prepare:runtime-assets）
+          pnpm --filter @zcode/desktop run build
+          # 再执行 bundle（跳过 prepare 和 build）
+          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
           ZCODE_SKIP_PREPARE: "1"
-          ZCODE_SKIP_BUILD: "0"
+          ZCODE_SKIP_BUILD: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           DEBUG: electron-builder
 
