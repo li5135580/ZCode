@@ -70,6 +70,9 @@ jobs:
           ZCODE_SKIP_BUILD: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           DEBUG: electron-builder
+          # 连接生产后端，同时使用 Preview 身份（与官方版并存，不冲突）
+          ZCODE_ENV: "production"
+          ZCODE_PREVIEW_IDENTITY: "1"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
