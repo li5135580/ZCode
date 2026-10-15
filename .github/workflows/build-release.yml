@@ -68,14 +68,26 @@ jobs:
           pnpm --dir packages/desktop exec tsup --version
           echo "=== Current working directory ==="
           pnpm --dir packages/desktop exec node -p "process.cwd()"
+
           echo "=== Running tsup ==="
-          pnpm --dir packages/desktop exec tsup 2>&1 | tee tsup-build.log
-          TSUP_EXIT_CODE=${PIPESTATUS[0]}
-          echo "=== tsup exit code: $TSUP_EXIT_CODE ==="
-          if [ $TSUP_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: tsup build failed"
+          if pnpm --dir packages/desktop exec tsup 2>&1 | tee tsup-build.log; then
+            echo "=== tsup build SUCCESS ==="
+          else
+            TSUP_EXIT_CODE=$?
+            echo "=== tsup build FAILED with exit code $TSUP_EXIT_CODE ==="
             echo "=== Last 100 lines of tsup output ==="
             tail -100 tsup-build.log
+
+            # 写入步骤摘要（不需要登录就能查看）
+            echo "## tsup Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Exit code: $TSUP_EXIT_CODE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Last 100 lines of output:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -100 tsup-build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
             exit $TSUP_EXIT_CODE
           fi
           echo "=== tsup done ==="
