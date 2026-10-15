@@ -62,7 +62,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Running tsup ==="
-          pnpm --dir packages/desktop exec tsup
+          pnpm --dir packages/desktop exec tsup 2>&1 || {
+            echo "ERROR: tsup failed with exit code $?"
+            echo "=== Full tsup output ==="
+            pnpm --dir packages/desktop exec tsup 2>&1 || true
+            exit 1
+          }
           echo "=== tsup done ==="
         env:
           ZCODE_ENV: "production"
