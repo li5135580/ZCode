@@ -17,10 +17,11 @@ jobs:
         include:
           - os: windows-latest
             target: win
-          - os: macos-latest
-            target: mac
-          - os: ubuntu-latest
-            target: linux
+          # 暂时跳过 macOS 和 Linux，先确保 Windows 构建成功
+          # - os: macos-latest
+          #   target: mac
+          # - os: ubuntu-latest
+          #   target: linux
 
     runs-on: ${{ matrix.os }}
 
