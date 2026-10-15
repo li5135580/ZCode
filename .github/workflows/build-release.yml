@@ -110,6 +110,15 @@ jobs:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
 
+      - name: Upload build debug info
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-debug-${{ matrix.os }}
+          path: |
+            packages/desktop/out/
+          retention-days: 1
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
