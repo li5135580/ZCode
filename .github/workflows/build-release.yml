@@ -57,36 +57,27 @@ jobs:
         env:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
-      - name: Build production bundles
+      - name: Build tsup bundles
         shell: bash
         run: |
           set -euo pipefail
-
           echo "=== Running tsup ==="
           pnpm --dir packages/desktop exec tsup
+          echo "=== tsup done ==="
+        env:
+          ZCODE_ENV: "production"
+          ZCODE_PREVIEW_IDENTITY: "1"
 
+      - name: Build vite renderer
+        shell: bash
+        run: |
+          set -euo pipefail
           echo "=== Running vite build ==="
-          echo "Current directory: $(pwd)"
-          echo "Checking vite availability..."
-          pnpm --dir packages/desktop exec vite --version || echo "vite not found via pnpm exec"
-          ls packages/desktop/node_modules/.bin/vite* 2>/dev/null || echo "vite not in node_modules/.bin"
-          ls node_modules/.bin/vite* 2>/dev/null || echo "vite not in root node_modules/.bin"
-
-          echo "Running vite build with full output..."
-          pnpm --dir packages/desktop exec vite build --config vite.config.ts 2>&1
-          VITE_EXIT_CODE=$?
-          echo "Vite build exit code: $VITE_EXIT_CODE"
-
-          if [ $VITE_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Vite build failed"
-            exit $VITE_EXIT_CODE
-          fi
-
+          pnpm --dir packages/desktop exec vite build --config vite.config.ts
+          echo "=== Vite build done ==="
           echo "=== Verifying renderer output ==="
           renderer_dir="packages/desktop/out/renderer"
-
           test -d "$renderer_dir" || { echo "ERROR: $renderer_dir not found"; exit 1; }
-
           for html in \
             index.html \
             resource-manager.html \
@@ -96,8 +87,7 @@ jobs:
             test -s "$renderer_dir/$html" || { echo "ERROR: missing $renderer_dir/$html"; exit 1; }
             echo "FOUND $renderer_dir/$html"
           done
-
-          echo "=== Build and renderer verification passed ==="
+          echo "=== Renderer verification passed ==="
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
