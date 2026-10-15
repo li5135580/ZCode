@@ -66,7 +66,21 @@ jobs:
           pnpm --dir packages/desktop exec tsup
 
           echo "=== Running vite build ==="
-          pnpm --dir packages/desktop exec vite build --config vite.config.ts
+          echo "Current directory: $(pwd)"
+          echo "Checking vite availability..."
+          pnpm --dir packages/desktop exec vite --version || echo "vite not found via pnpm exec"
+          ls packages/desktop/node_modules/.bin/vite* 2>/dev/null || echo "vite not in node_modules/.bin"
+          ls node_modules/.bin/vite* 2>/dev/null || echo "vite not in root node_modules/.bin"
+
+          echo "Running vite build with full output..."
+          pnpm --dir packages/desktop exec vite build --config vite.config.ts 2>&1
+          VITE_EXIT_CODE=$?
+          echo "Vite build exit code: $VITE_EXIT_CODE"
+
+          if [ $VITE_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Vite build failed"
+            exit $VITE_EXIT_CODE
+          fi
 
           echo "=== Verifying renderer output ==="
           renderer_dir="packages/desktop/out/renderer"
