@@ -57,17 +57,6 @@ jobs:
         env:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
-      - name: Build tsup bundles
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Running tsup ==="
-          pnpm --dir packages/desktop exec tsup
-          echo "=== tsup done ==="
-        env:
-          ZCODE_ENV: "production"
-          ZCODE_PREVIEW_IDENTITY: "1"
-
       - name: Build vite renderer
         shell: bash
         run: |
@@ -88,6 +77,17 @@ jobs:
             echo "FOUND $renderer_dir/$html"
           done
           echo "=== Renderer verification passed ==="
+        env:
+          ZCODE_ENV: "production"
+          ZCODE_PREVIEW_IDENTITY: "1"
+
+      - name: Build tsup bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Running tsup ==="
+          pnpm --dir packages/desktop exec tsup
+          echo "=== tsup done ==="
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
