@@ -50,8 +50,7 @@ function parseLooseFrontmatter(frontmatter: string): {
   const lines = frontmatter.split(/\r?\n/u);
   let pendingListKey: string | undefined;
 
-  for (let index = 0; index < lines.length; index++) {
-    const rawLine = lines[index]!;
+  for (const rawLine of lines) {
     const line = rawLine.trimEnd();
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
 
@@ -86,26 +85,12 @@ function parseLooseFrontmatter(frontmatter: string): {
     if (!keyValue) continue;
     const key = keyValue[1]!;
     const rawValue = keyValue[2] ?? "";
-
-    // 检测嵌套对象（如 modelChain:）
     if (rawValue.trim() === "") {
-      // 检查下一行是否是缩进的块
-      const nextLine = lines[index + 1];
-      if (nextLine && /^\s+\S/u.test(nextLine)) {
-        // 解析嵌套块
-        const nestedResult = parseNestedBlock(lines, index + 1);
-        if (nestedResult) {
-          values[key] = nestedResult.value;
-          index = nestedResult.endIndex; // 跳过已处理的行
-          continue;
-        }
-      }
       values[key] = [];
       bareValueKeys.add(key);
       pendingListKey = key;
       continue;
     }
-
     if (key === "mcpServers" && hasUnquotedInlineMappingItem(rawValue)) {
       invalidNestedListKeys.add(key);
     }
@@ -113,163 +98,6 @@ function parseLooseFrontmatter(frontmatter: string): {
   }
 
   return { bareValueKeys, invalidNestedListKeys, values };
-}
-
-/**
- * 解析嵌套块（如 modelChain: 下的内容）
- * 返回解析后的值和结束行索引
- */
-function parseNestedBlock(
-  lines: string[],
-  startIndex: number,
-): { value: unknown; endIndex: number } | null {
-  const result: Record<string, unknown> = {};
-  let currentIndex = startIndex;
-  let currentIndent: number | null = null;
-
-  while (currentIndex < lines.length) {
-    const rawLine = lines[currentIndex]!;
-    const line = rawLine.trimEnd();
-
-    // 空行或注释行跳过
-    if (!line.trim() || line.trimStart().startsWith("#")) {
-      currentIndex++;
-      continue;
-    }
-
-    // 计算缩进
-    const indent = rawLine.length - rawLine.trimStart().length;
-
-    // 如果缩进小于初始缩进，说明块结束
-    if (currentIndent !== null && indent < currentIndent) {
-      break;
-    }
-
-    // 设置初始缩进
-    if (currentIndent === null) {
-      currentIndent = indent;
-    }
-
-    // 如果缩进大于初始缩进，说明是更深层的嵌套（暂不支持，跳过）
-    if (indent > currentIndent) {
-      currentIndex++;
-      continue;
-    }
-
-    // 解析键值对
-    const keyValue = line.trim().match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
-    if (keyValue) {
-      const key = keyValue[1]!;
-      const rawValue = keyValue[2] ?? "";
-
-      // 检查是否有更深层的嵌套
-      if (rawValue.trim() === "") {
-        const nextLine = lines[currentIndex + 1];
-        if (nextLine && /^\s+\S/u.test(nextLine)) {
-          // `- item` 形式的列表（如 modelChain.fallbacks）必须按列表解析，
-          // 否则会退化成空数组，备用模型在运行时静默丢失。
-          const nestedList = /^\s+-\s/u.test(nextLine)
-            ? parseNestedListBlock(lines, currentIndex + 1)
-            : null;
-          const nestedResult =
-            nestedList ?? parseNestedBlock(lines, currentIndex + 1);
-          if (nestedResult) {
-            result[key] = nestedResult.value;
-            currentIndex = nestedResult.endIndex + 1;
-            continue;
-          }
-        }
-        result[key] = [];
-      } else {
-        result[key] = parseScalarValue(rawValue);
-      }
-      currentIndex++;
-      continue;
-    }
-
-    // 解析列表项
-    const listMatch = line.trim().match(/^-\s+(.*)$/u);
-    if (listMatch) {
-      // 列表项暂不支持在嵌套块中，跳过
-      currentIndex++;
-      continue;
-    }
-
-    currentIndex++;
-  }
-
-  return Object.keys(result).length > 0 ? { value: result, endIndex: currentIndex - 1 } : null;
-}
-
-/**
- * 解析嵌套块中的列表（如 modelChain.fallbacks）。
- *
- * 支持两种列表项：映射项（`- providerId: x` 后跟更深缩进的同项字段）与标量项。
- * 返回解析后的数组和最后一行索引；非列表内容返回 null，交回调用方按嵌套块处理。
- */
-function parseNestedListBlock(
-  lines: string[],
-  startIndex: number,
-): { value: unknown[]; endIndex: number } | null {
-  const items: unknown[] = [];
-  let currentIndex = startIndex;
-  let itemIndent: number | null = null;
-
-  while (currentIndex < lines.length) {
-    const rawLine = lines[currentIndex]!;
-    const line = rawLine.trimEnd();
-    if (!line.trim() || line.trimStart().startsWith("#")) {
-      currentIndex++;
-      continue;
-    }
-
-    const indent = rawLine.length - rawLine.trimStart().length;
-    if (itemIndent === null) {
-      itemIndent = indent;
-    } else if (indent < itemIndent) {
-      break;
-    } else if (indent > itemIndent) {
-      // 比列表项更深的缩进已由当前项的收集逻辑消费；这里只兜底跳过。
-      currentIndex++;
-      continue;
-    }
-
-    const listMatch = line.trim().match(/^-\s*(.*)$/u);
-    if (!listMatch) break;
-    const itemText = (listMatch[1] ?? "").trim();
-    const itemKeyValue = itemText.match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
-    if (!itemKeyValue) {
-      items.push(parseScalarValue(itemText));
-      currentIndex++;
-      continue;
-    }
-
-    // 映射项：先写首行字段，再收集比列表项更深的同项字段。
-    const item: Record<string, unknown> = {};
-    const firstKey = itemKeyValue[1]!;
-    const firstValue = itemKeyValue[2] ?? "";
-    if (firstValue.trim() !== "") item[firstKey] = parseScalarValue(firstValue);
-
-    let nextIndex = currentIndex + 1;
-    while (nextIndex < lines.length) {
-      const nextLine = lines[nextIndex]!;
-      if (!nextLine.trim()) {
-        nextIndex++;
-        continue;
-      }
-      const nextIndent = nextLine.length - nextLine.trimStart().length;
-      if (nextIndent <= itemIndent) break;
-      const nextKeyValue = nextLine.trim().match(/^([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/u);
-      if (nextKeyValue) {
-        item[nextKeyValue[1]!] = parseScalarValue(nextKeyValue[2] ?? "");
-      }
-      nextIndex++;
-    }
-    items.push(item);
-    currentIndex = nextIndex;
-  }
-
-  return items.length > 0 ? { value: items, endIndex: currentIndex - 1 } : null;
 }
 
 function parseMcpServerNames(
