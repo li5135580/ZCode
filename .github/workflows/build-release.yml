@@ -61,14 +61,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "=== Environment info ==="
+          node --version
+          pnpm --version
+          echo "=== tsup version ==="
+          pnpm --dir packages/desktop exec tsup --version
+          echo "=== Current working directory ==="
+          pnpm --dir packages/desktop exec node -p "process.cwd()"
           echo "=== Running tsup ==="
-          pnpm --dir packages/desktop exec tsup 2>&1 || {
-            echo "ERROR: tsup failed with exit code $?"
-            echo "=== Full tsup output ==="
-            pnpm --dir packages/desktop exec tsup 2>&1 || true
-            exit 1
-          }
+          pnpm --dir packages/desktop exec tsup 2>&1 | tee tsup-build.log
+          TSUP_EXIT_CODE=${PIPESTATUS[0]}
+          echo "=== tsup exit code: $TSUP_EXIT_CODE ==="
+          if [ $TSUP_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: tsup build failed"
+            echo "=== Last 100 lines of tsup output ==="
+            tail -100 tsup-build.log
+            exit $TSUP_EXIT_CODE
+          fi
           echo "=== tsup done ==="
+          ls -la packages/desktop/out/main/ || echo "out/main not found"
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
