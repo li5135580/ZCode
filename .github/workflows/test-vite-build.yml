@@ -1,0 +1,42 @@
+name: Test Vite Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm@10.33.2
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Test vite build
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Testing vite build ==="
+          echo "Current directory: $(pwd)"
+          echo "Checking vite availability..."
+          pnpm --dir packages/desktop exec vite --version
+          echo "Running vite build..."
+          pnpm --dir packages/desktop exec vite build --config vite.config.ts
+          echo "=== Build done ==="
+          echo "Checking output..."
+          ls -la packages/desktop/out/renderer/ || echo "not found"
+          ls packages/desktop/out/renderer/*.html 2>/dev/null || echo "no HTML files"
