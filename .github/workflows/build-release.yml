@@ -63,17 +63,18 @@ jobs:
           echo "=== Running tsup ==="
           cd packages/desktop && pnpm exec tsup
           echo "=== Running vite build ==="
-          cd packages/desktop && node ../../node_modules/vite/bin/vite.js build
-          echo "=== Build done ==="
-          echo "=== Checking all possible renderer output locations ==="
-          echo "--- packages/desktop/out/renderer ---"
-          ls -la packages/desktop/out/renderer/ 2>/dev/null || echo "not found"
-          echo "--- out/renderer (repo root) ---"
-          ls -la out/renderer/ 2>/dev/null || echo "not found"
-          echo "--- packages/desktop/out/renderer/*.html ---"
-          ls packages/desktop/out/renderer/*.html 2>/dev/null || echo "no HTML"
-          echo "--- out/renderer/*.html (repo root) ---"
-          ls out/renderer/*.html 2>/dev/null || echo "no HTML"
+          cd packages/desktop && node ../../node_modules/vite/bin/vite.js build 2>&1 | tee /tmp/vite-build.log
+          VITE_EXIT_CODE=${PIPESTATUS[0]}
+          echo "=== Vite build exit code: $VITE_EXIT_CODE ==="
+          echo "=== Vite build output (last 50 lines) ==="
+          tail -50 /tmp/vite-build.log
+          echo "=== Checking renderer output ==="
+          ls -la packages/desktop/out/renderer/ 2>/dev/null || echo "packages/desktop/out/renderer not found"
+          ls -la out/renderer/ 2>/dev/null || echo "out/renderer (repo root) not found"
+          if [ $VITE_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Vite build failed with exit code $VITE_EXIT_CODE"
+            exit $VITE_EXIT_CODE
+          fi
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
