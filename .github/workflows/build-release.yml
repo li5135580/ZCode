@@ -61,6 +61,12 @@ jobs:
         run: |
           # 先执行 build（包含 prepare:runtime-assets）
           pnpm --filter @zcode/desktop run build
+          # 检查 renderer 构建产物
+          echo "=== Checking renderer build output ==="
+          ls -la packages/desktop/out/renderer/ || echo "out/renderer not found"
+          ls -la packages/desktop/out/renderer/*.html 2>/dev/null || echo "No HTML files in out/renderer"
+          ls -la packages/desktop/out/renderer/assets/ 2>/dev/null | head -5 || echo "No assets in out/renderer"
+          echo "=== Renderer check done ==="
           # 再执行 bundle（跳过 prepare 和 build）
           pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
         env:
