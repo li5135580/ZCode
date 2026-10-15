@@ -1,0 +1,38 @@
+name: Test Tsup Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm@10.33.2
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Test tsup build
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Testing tsup build ==="
+          pnpm --dir packages/desktop exec tsup
+          echo "=== tsup build done ==="
+          ls -la packages/desktop/out/main/ || echo "out/main not found"
