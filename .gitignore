@@ -73,3 +73,7 @@ packages/desktop/resources/macos-window-bounds/
 __pycache__/
 *.pyc
 .zcode-runtime
+
+# lint-staged 运行期生成的临时清单（scripts/run-lint-staged-vitest.mjs），非源码。
+.lint-staged-vitest-*.json
+

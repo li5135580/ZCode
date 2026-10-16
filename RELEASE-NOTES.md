@@ -1,4 +1,4 @@
-# ZCode 二开增强版 v3.15.3
+# ZCode 二开增强版（构建标签 `v3.15.1-fork.2`）
 
 ## 📦 发布内容
 
@@ -10,9 +10,13 @@
 | `ZCode.Preview-3.15.1-win-x64.exe` | 生产后端，无后缀 | production |
 | `ZCode.Preview-3.15.1-win-x64_TEST.exe` | 测试后端 | test |
 
-> 产物文件名中的版本号取自构建时的 `package.json`。安装包以 **Preview 身份**构建
-> （应用名 `ZCode Preview`、独立数据目录 `%LOCALAPPDATA%\Programs\ZCode Preview\`），
-> 与官方 ZCode 可并排安装、互不覆盖。
+> 产物文件名中的版本号取自构建时的 `package.json`，而该版本号**始终与上游对齐**
+> （当前 `3.15.1`），不由二开自行提升，以免上游同步时产生版本号冲突。
+> fork 自己的构建用 tag 区分（本版为 `v3.15.1-fork.2`），因此**文件名可能与更早的
+> Release 重名**，请以 Release 标签为准。
+>
+> 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
+> `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
 
 ## ✨ 增强功能
 

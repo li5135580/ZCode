@@ -54,16 +54,14 @@ jobs:
       - name: Build installer
         shell: bash
         run: |
-          LOG="$GITHUB_WORKSPACE/build.log"
-          : > "$LOG"
-          exec > >(tee -a "$LOG") 2>&1
-
+          # bash + 显式退出码传递：Windows runner 的 PowerShell 不会把原生命令的退出码
+          # 传出去，历史上因此出现过多次「绿色但实际失败」的假阳性。
           echo "=== [1/2] desktop build ==="
           pnpm --filter @zcode/desktop run build
           RC_BUILD=$?
           echo "=== desktop build exit code: $RC_BUILD ==="
           if [ "$RC_BUILD" -ne 0 ]; then
-            echo "::error title=desktop build failed (exit $RC_BUILD)::pnpm run build 失败，见 ci-logs 分支"
+            echo "::error title=desktop build failed (exit $RC_BUILD)::pnpm run build 失败，见本次运行的 Build installer 步骤日志"
             exit "$RC_BUILD"
           fi
 
@@ -72,7 +70,7 @@ jobs:
           RC_BUNDLE=$?
           echo "=== bundle exit code: $RC_BUNDLE ==="
           if [ "$RC_BUNDLE" -ne 0 ]; then
-            echo "::error title=bundle failed (exit $RC_BUNDLE)::electron-builder 打包失败，见 ci-logs 分支"
+            echo "::error title=bundle failed (exit $RC_BUNDLE)::electron-builder 打包失败，见本次运行的 Build installer 步骤日志"
             exit "$RC_BUNDLE"
           fi
         env:
@@ -81,7 +79,6 @@ jobs:
           ZCODE_SKIP_PREPARE: "1"
           ZCODE_SKIP_BUILD: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          DEBUG: electron-builder
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
 
@@ -101,38 +98,6 @@ jobs:
             echo "FOUND $renderer_dir/$html"
           done
           echo "=== Renderer verification passed ==="
-
-      - name: Publish build log to ci-logs branch
-        if: failure()
-        shell: bash
-        run: |
-          LOG="$GITHUB_WORKSPACE/build.log"
-          if [ ! -f "$LOG" ]; then echo "no build.log to publish"; exit 0; fi
-          rm -rf /tmp/logrepo && mkdir -p /tmp/logrepo && cd /tmp/logrepo
-          git init -q
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          {
-            printf '# Build log\n\ncommit %s\n\n```\n' "${{ github.sha }}"
-            # 同时保留开头和结尾，便于定位失败点（vite 输出会占满 tail）
-            head -150 "$LOG"
-            printf '\n... (中间省略) ...\n\n'
-            tail -800 "$LOG"
-            printf '\n```\n'
-          } > build-log.md
-          git add build-log.md
-          git commit -q -m "ci-log ${{ github.sha }}"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:ci-logs
-          echo "build log published to ci-logs branch"
-
-      - name: Upload build debug info
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: build-debug-${{ matrix.os }}
-          path: |
-            packages/desktop/out/
-          retention-days: 1
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5

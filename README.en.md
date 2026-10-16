@@ -65,65 +65,31 @@ modelChain:
 
 ## 📦 Installation
 
-### Option 1: Using Patch Package (Recommended)
+### Option 1: Download the installer (Recommended)
 
-**For users who want to quickly try the enhanced features without building from source**
+**For users who want to try the enhanced features without building from source**
 
-**Steps**:
+Download `ZCode.Preview-<version>-win-x64.exe` from this repository's
+[Releases](https://github.com/li5135580/ZCode/releases/latest) and install it.
 
-1. **Install Official ZCode**
-   - Download and install ZCode v3.14.3 from [Official Releases](https://github.com/zai-org/ZCode/releases/latest)
+The installer is **built from this fork's source by CI** (not a patch applied on top of the
+official package), so the enhanced features are already included:
 
-2. **Download and Apply Patch**
+- Subagent model chains
+- Automatic model fetching
+- Update source pointing at this repository's Releases
 
-   **Method A: Using Executable (Easiest)**
-   
-   ```bash
-   # Download patch package
-   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
-   
-   # Extract
-   unzip zcode-patch.zip
-   
-   # Windows: Double-click to run
-   zcode-patch/dist/apply-patch-win.exe
-   
-   # macOS:
-   chmod +x zcode-patch/dist/apply-patch-macos
-   ./zcode-patch/dist/apply-patch-macos
-   
-   # Linux:
-   chmod +x zcode-patch/dist/apply-patch-linux
-   ./zcode-patch/dist/apply-patch-linux
-   ```
+**Notes**:
 
-   **Method B: Using Node.js (Requires Node.js)**
-   
-   ```bash
-   # Download patch package
-   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
-   
-   # Extract
-   unzip zcode-patch.zip
-   
-   # Run patch applier
-   node zcode-patch/scripts/apply-patch.js
-   ```
-
-3. **Restart ZCode**
-   - After applying the patch, restart ZCode to enjoy the enhanced features
-
-**Restore to Official Version**:
-
-```bash
-# Using executable
-zcode-patch/dist/restore-backup-win.exe  # Windows
-./zcode-patch/dist/restore-backup-macos  # macOS
-./zcode-patch/dist/restore-backup-linux  # Linux
-
-# Or using Node.js
-node zcode-patch/scripts/restore-backup.js
-```
+- The installer uses the **Preview identity** (app name `ZCode Preview`, separate data
+  directory), so it installs side by side with the official ZCode without overwriting it.
+- The installer is **not code-signed**. Windows may show a SmartScreen prompt on first run;
+  choose "More info → Run anyway". If you run third-party antivirus software (e.g. Huorong),
+  the first launch can be slower than usual while it scans the newly written files — this is
+  expected.
+- **Auto-update is disabled under the Preview identity** by upstream design
+  (`ZCODE_PRODUCT_FLAVOR === "production"` is required to enable it). To upgrade, download
+  the newer installer and install over the existing version.
 
 ### Option 2: Build from Source
 
@@ -146,6 +112,11 @@ pnpm build:zcode
 pnpm dev:desktop
 ```
 
+> ⚠️ Local builds are path-sensitive: when the repository lives under a path containing
+> **non-ASCII characters** (e.g. Chinese), Node's `fs.cpSync` hits a known Windows unlink bug
+> (reports "The operation completed successfully" while actually failing) and stalls at
+> `prepare:agent-bundle`. Use a pure-ASCII path, or rely on the CI build instead.
+
 ---
 
 ## Original Description
@@ -154,7 +125,10 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 
 ## Updates
 
-- 2026-10-14: Enhanced version v3.15.2 released, adding subagent multi-model chain, automatic model fetching, GitHub Actions auto sync, and more.
+- 2026-10-17: Fixed "fetch model list" writing a wrong context window size (glm-5.3 was
+  recorded as 200k while it is actually 1M), and fixed the upstream sync workflow failing
+  every hour.
+- 2026-10-14: Enhanced version released, adding subagent multi-model chain, automatic model fetching, GitHub Actions auto sync, and more.
 - 2026-10-10: Updated to ZCode v3.15.1.
 - 2026-9-23: Updated to ZCode v3.14.3.
 

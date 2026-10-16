@@ -2,7 +2,10 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
-## [3.15.3] - 2026-10-17
+## [二开 2026-10-17] - 2026-10-17
+
+> `package.json` 的版本号始终与上游对齐（当前 `3.15.1`），不再由二开自行提升，
+> 以免上游同步时产生版本号冲突。fork 自己的构建用 tag 区分（`v3.15.1-fork.N`）。
 
 ### 修复
 
@@ -24,8 +27,6 @@
 - 移除 `patches/001-subagent-model-chain.patch`、`patches/002-update-source-fix.patch`
   两个二开内容快照（它们没有任何构建配置引用，只被上述已修复的同步步骤使用）。
   `patches/` 目录现在只存放 pnpm `patchedDependencies` 的依赖补丁，说明见 `patches/README.md`。
-- 版本号从 `3.15.1` 提升到 `3.15.3`，使构建产物名（`ZCode.Preview-<version>-win-x64.exe`）
-  与已发布的旧包区分开。
 
 ## [3.15.2] - 2026-10-14
 
