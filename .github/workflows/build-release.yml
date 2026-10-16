@@ -56,13 +56,18 @@ jobs:
         run: |
           set -o pipefail
           {
-            set -e
             echo "=== desktop build ==="
             pnpm --filter @zcode/desktop run build
             echo "=== electron-builder bundle ==="
             pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
           } 2>&1 | tee /tmp/build.log
-          exit ${PIPESTATUS[0]}
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" -ne 0 ]; then
+            # annotation 无需登录即可在 run 页面查看，用于暴露真实错误
+            TAIL=$(tail -20 /tmp/build.log | tr '\n' '\r' | tr -d '\000' | sed 's/\r/ | /g' | cut -c1-3000)
+            echo "::error title=Build failed (exit $STATUS)::${TAIL}"
+            exit "$STATUS"
+          fi
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
