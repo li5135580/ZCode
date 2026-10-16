@@ -51,14 +51,30 @@ jobs:
           pnpm --version
           pnpm config get registry
 
-      - name: Prepare runtime assets
-        run: pnpm --filter @zcode/desktop run prepare:runtime-assets
+      - name: Build installer
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            echo "=== desktop build ==="
+            pnpm --filter @zcode/desktop run build
+            echo "=== electron-builder bundle ==="
+            pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+          } 2>&1 | tee /tmp/build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            # 用 annotation 暴露错误摘要（annotation 无需登录即可在 run 页面查看）
+            TAIL=$(tail -25 /tmp/build.log | tr '\n' '~' | sed 's/~/ | /g' | cut -c1-3500)
+            echo "::error title=Build failed (exit $STATUS)::${TAIL}"
+            exit $STATUS
+          fi
         env:
+          ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
-
-      - name: Build production bundles
-        run: pnpm --filter @zcode/desktop run build:no-runtime-assets
-        env:
+          ZCODE_SKIP_PREPARE: "1"
+          ZCODE_SKIP_BUILD: "1"
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          DEBUG: electron-builder
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
 
@@ -78,18 +94,6 @@ jobs:
             echo "FOUND $renderer_dir/$html"
           done
           echo "=== Renderer verification passed ==="
-
-      - name: Bundle installer
-        run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
-        env:
-          ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
-          ZCODE_SKIP_REMOTE_ASSETS: "1"
-          ZCODE_SKIP_PREPARE: "1"
-          ZCODE_SKIP_BUILD: "1"
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          DEBUG: electron-builder
-          ZCODE_ENV: "production"
-          ZCODE_PREVIEW_IDENTITY: "1"
 
       - name: Upload build debug info
         if: always()
