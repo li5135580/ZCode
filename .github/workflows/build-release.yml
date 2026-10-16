@@ -57,53 +57,16 @@ jobs:
         env:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
-      - name: Build tsup bundles
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Environment info ==="
-          node --version
-          pnpm --version
-          echo "=== tsup version ==="
-          pnpm --dir packages/desktop exec tsup --version
-          echo "=== Current working directory ==="
-          pnpm --dir packages/desktop exec node -p "process.cwd()"
-
-          echo "=== Running tsup ==="
-          if pnpm --dir packages/desktop exec tsup 2>&1 | tee tsup-build.log; then
-            echo "=== tsup build SUCCESS ==="
-          else
-            TSUP_EXIT_CODE=$?
-            echo "=== tsup build FAILED with exit code $TSUP_EXIT_CODE ==="
-            echo "=== Last 100 lines of tsup output ==="
-            tail -100 tsup-build.log
-
-            # 写入步骤摘要（不需要登录就能查看）
-            echo "## tsup Build Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Exit code: $TSUP_EXIT_CODE" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Last 100 lines of output:" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -100 tsup-build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-
-            exit $TSUP_EXIT_CODE
-          fi
-          echo "=== tsup done ==="
-          ls -la packages/desktop/out/main/ || echo "out/main not found"
+      - name: Build production bundles
+        run: pnpm --filter @zcode/desktop run build:no-runtime-assets
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
 
-      - name: Build vite renderer
+      - name: Verify renderer build output
         shell: bash
         run: |
           set -euo pipefail
-          echo "=== Running vite build ==="
-          pnpm --dir packages/desktop exec vite build --config vite.config.ts
-          echo "=== Vite build done ==="
-          echo "=== Verifying renderer output ==="
           renderer_dir="packages/desktop/out/renderer"
           test -d "$renderer_dir" || { echo "ERROR: $renderer_dir not found"; exit 1; }
           for html in \
@@ -116,9 +79,6 @@ jobs:
             echo "FOUND $renderer_dir/$html"
           done
           echo "=== Renderer verification passed ==="
-        env:
-          ZCODE_ENV: "production"
-          ZCODE_PREVIEW_IDENTITY: "1"
 
       - name: Bundle installer
         run: pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
