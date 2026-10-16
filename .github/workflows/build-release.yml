@@ -54,20 +54,13 @@ jobs:
       - name: Build installer
         shell: bash
         run: |
-          set -o pipefail
-          {
-            echo "=== desktop build ==="
-            pnpm --filter @zcode/desktop run build
-            echo "=== electron-builder bundle ==="
-            pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
-          } 2>&1 | tee /tmp/build.log
-          STATUS=${PIPESTATUS[0]}
-          if [ "$STATUS" -ne 0 ]; then
-            # annotation 无需登录即可在 run 页面查看，用于暴露真实错误
-            TAIL=$(tail -20 /tmp/build.log | tr '\n' '\r' | tr -d '\000' | sed 's/\r/ | /g' | cut -c1-3000)
-            echo "::error title=Build failed (exit $STATUS)::${TAIL}"
-            exit "$STATUS"
-          fi
+          set -eo pipefail
+          LOG=/tmp/build.log
+          : > "$LOG"
+          echo "=== desktop build ===" | tee -a "$LOG"
+          pnpm --filter @zcode/desktop run build 2>&1 | tee -a "$LOG"
+          echo "=== electron-builder bundle ===" | tee -a "$LOG"
+          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64 2>&1 | tee -a "$LOG"
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
@@ -99,21 +92,21 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p ci-logs
-          LOGFILE="/tmp/build.log"
-          {
-            printf '# Build log\n\ncommit: %s\n\n' "${{ github.sha }}"
-            printf '```\n'
-            if [ -f "$LOGFILE" ]; then tail -500 "$LOGFILE"; else echo "(no build.log found)"; fi
-            printf '\n```\n'
-          } > ci-logs/build-log.md
+          LOG=/tmp/build.log
+          if [ ! -f "$LOG" ]; then echo "no build.log to publish"; exit 0; fi
+          rm -rf /tmp/logrepo && mkdir -p /tmp/logrepo && cd /tmp/logrepo
+          git init -q
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan ci-logs-work 2>/dev/null || git checkout ci-logs-work
-          git add -f ci-logs/build-log.md
-          git commit -m "ci-log ${{ github.sha }}" || true
-          git push -f origin HEAD:ci-logs
+          {
+            printf '# Build log\n\ncommit %s\n\n```\n' "${{ github.sha }}"
+            tail -600 "$LOG"
+            printf '\n```\n'
+          } > build-log.md
+          git add build-log.md
+          git commit -q -m "ci-log ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:ci-logs
+          echo "build log published to ci-logs branch"
 
       - name: Upload build debug info
         if: always()
