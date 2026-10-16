@@ -1,28 +1,33 @@
-# 二开补丁管理
+# 补丁目录说明
 
-本目录存放二开修改的补丁文件，用于上游同步时自动应用。
+本目录**只存放 pnpm `patchedDependencies` 引用的依赖补丁**（见根目录 `package.json` 的
+`pnpm.patchedDependencies`）。这些补丁作用于 `node_modules` 内的第三方包，由 pnpm 在
+`pnpm install` 时自动应用，文件名形如 `vitest@4.1.7.patch`、`@arms__rum-electron@0.0.3.patch`。
 
-> 注意：本目录同时存放 pnpm `patchedDependencies` 引用的依赖补丁（如 `vitest@4.1.7.patch`、
-> `@arms__rum-electron@0.0.3.patch` 等，见根目录 `package.json` 的 `pnpm.patchedDependencies`）。
-> 这些依赖补丁作用于 `node_modules` 内的包，**不是** git 工作树补丁，不能用于 `git apply`。
->
-> 为避免误用，二开补丁统一以 `0NN-` 命名（如 `001-*.patch`），`.github/workflows/sync-upstream.yml`
-> 只对 `patches/0*.patch` 执行 `git apply --3way`。
+## 二开改动不放在这里
 
-## 使用方式
+二开（子智能体模型链、模型自动获取、自定义更新源）本身就是 `main` 分支上的普通提交，
+不需要补丁文件：
 
-1. 生成补丁：
-   ```bash
-   git diff upstream/main > patches/001-custom-changes.patch
-   ```
+- **上游同步**：`.github/workflows/sync-upstream.yml` 用 `git merge upstream/main` 合并，
+  二开提交会被 git 自然保留；冲突时中止并创建 Issue 通知人工处理。
+- **查看二开改动**：`git log aac47556..HEAD`，或 `git diff aac47556..HEAD`。
+- **需要导出补丁时**（例如往另一份 clone 移植）：`git diff aac47556..HEAD > custom.patch`。
 
-2. 应用补丁（只应用二开补丁，避免误用 pnpm 依赖补丁）：
-   ```bash
-   git apply patches/0*.patch --3way
-   ```
+### 为什么删掉了 `001-*.patch` / `002-*.patch`
 
-## 补丁列表
+这两个文件曾是二开内容的补丁快照，同步工作流会在 merge 之后对它们执行
+`git apply --3way`。但二开改动早已作为提交存在于工作树里，apply 必然报
+`already exists` / `patch does not apply`，导致同步工作流**每小时都失败**。
+去掉补丁重放后，同步只做一次普通 merge。
 
-- `001-subagent-model-chain.patch` - 子智能体多模型链支持
-- `002-model-auto-fetch.patch` - 模型自动获取功能
-- `003-update-source.patch` - 更新源修改
+历史上本目录曾把「依赖补丁」与「二开补丁」混在一起，靠 `0NN-` 前缀区分。现在二开补丁
+已移除，不再需要该约定。
+
+## 新增依赖补丁
+
+```bash
+pnpm patch <package>@<version>
+# 编辑 node_modules 中解出的目录
+pnpm patch-commit <解出目录>
+```

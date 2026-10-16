@@ -46,14 +46,15 @@ modelChain:
 
 ### 2. 模型自动获取
 
-- **自动获取上游模型列表**：支持从 OpenAI、Anthropic、Z.AI 等 Provider 自动获取模型列表
-- **参数自动识别**：自动识别模型的 contextWindow、maxOutputTokens、reasoningLevel 等参数
+- **自动获取上游模型列表**：支持从 [OI]、Anthropic、Z.AI 等 Provider 自动获取模型列表
+- **参数自动识别**：API 返回了能力元数据时（contextWindow、maxOutputTokens、输入格式）
+  原样落地；未返回的字段保持缺省，交由 Host 推荐规则表按模型 ID 解析
 - **一键添加**：在模型设置页面一键添加获取到的模型
 
 ### 3. GitHub Actions 自动同步与发版
 
-- **自动同步上游**：每小时检测上游仓库更新，自动合并并应用二开补丁
-- **自动构建发版**：推送后自动构建多平台安装包（Windows、macOS、Linux）并发版
+- **自动同步上游**：每小时检测上游仓库是否有新提交，有则自动 merge（二开改动由 git 自然保留）
+- **自动构建发版**：推送后自动构建安装包（Windows、macOS、Linux）并发版
 - **冲突自动通知**：合并冲突时自动创建 Issue 通知
 
 ### 4. 自定义更新源
@@ -65,65 +66,28 @@ modelChain:
 
 ## 📦 安装使用
 
-### 方案 1：使用补丁包（推荐）
+### 方案 1：直接下载安装包（推荐）
 
 **适合用户**：想快速体验二开功能，不想自己构建
 
-**步骤**：
+从本仓库的 [Releases](https://github.com/li5135580/ZCode/releases/latest) 下载
+`ZCode.Preview-<版本>-win-x64.exe` 并安装即可。
 
-1. **安装官方 ZCode**
-   - 从 [官方 Releases](https://github.com/zai-org/ZCode/releases/latest) 下载并安装 ZCode v3.14.3
+该安装包由本仓库的 CI 从二开源码完整构建（不是对官方包打补丁），二开功能已内置：
 
-2. **下载并应用补丁**
+- 子智能体多模型链
+- 模型自动获取
+- 更新源指向本仓库 Releases
 
-   **方式 A：使用可执行文件（最简单）**
-   
-   ```bash
-   # 下载补丁包
-   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
-   
-   # 解压
-   unzip zcode-patch.zip
-   
-   # Windows：双击运行
-   zcode-patch/dist/apply-patch-win.exe
-   
-   # macOS：
-   chmod +x zcode-patch/dist/apply-patch-macos
-   ./zcode-patch/dist/apply-patch-macos
-   
-   # Linux：
-   chmod +x zcode-patch/dist/apply-patch-linux
-   ./zcode-patch/dist/apply-patch-linux
-   ```
+**说明**：
 
-   **方式 B：使用 Node.js（需要安装 Node.js）**
-   
-   ```bash
-   # 下载补丁包
-   curl -L -o zcode-patch.zip https://github.com/li5135580/ZCode/releases/download/v3.15.2/zcode-patch-v3.15.2.zip
-   
-   # 解压
-   unzip zcode-patch.zip
-   
-   # 运行补丁应用器
-   node zcode-patch/scripts/apply-patch.js
-   ```
-
-3. **重启 ZCode**
-   - 补丁应用完成后，重启 ZCode 即可享受增强功能
-
-**恢复官方版本**：
-
-```bash
-# 使用可执行文件
-zcode-patch/dist/restore-backup-win.exe  # Windows
-./zcode-patch/dist/restore-backup-macos  # macOS
-./zcode-patch/dist/restore-backup-linux  # Linux
-
-# 或使用 Node.js
-node zcode-patch/scripts/restore-backup.js
-```
+- 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录），
+  与官方 ZCode 可以并排安装、互不覆盖。
+- 安装包**未做代码签名**。Windows 首次运行可能出现 SmartScreen 提示，
+  需选择「更多信息 → 仍要运行」；若装有第三方杀毒软件（如火绒），
+  首次启动可能因实时扫描较慢，属正常现象。
+- Preview 身份下**自动更新被上游设计禁用**（`ZCODE_PRODUCT_FLAVOR === "production"`
+  才启用）。要升级请重新下载新版本安装包覆盖安装。
 
 ### 方案 2：从源码构建
 
@@ -146,6 +110,10 @@ pnpm build:zcode
 pnpm dev:desktop
 ```
 
+> ⚠️ 本地构建对路径敏感：仓库位于**含中文的路径**下时，Node 的 `fs.cpSync` 在 Windows
+> 会命中已知 unlink bug（报 "The operation completed successfully" 但实际失败），
+> 卡在 `prepare:agent-bundle`。请使用纯 ASCII 路径，或直接依赖 CI 构建。
+
 ---
 
 ## 原版说明
@@ -154,6 +122,8 @@ ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Age
 
 ## 更新
 
+- 2026-10-17：v3.15.3 修复「获取模型列表」写错上下文窗口大小（glm-5.3 被误写成 200k，
+  实际 1M），并修复上游同步工作流每小时必然失败的问题。
 - 2026-10-14：二开增强版 v3.15.2 发布，添加子智能体多模型链、模型自动获取、GitHub Actions 自动同步等功能。
 - 2026-10-10：更新至 ZCode v3.15.1 版本。
 - 2026-9-23：更新至 ZCode v3.14.3 版本。

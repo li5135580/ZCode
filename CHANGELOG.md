@@ -2,6 +2,31 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
+## [3.15.3] - 2026-10-17
+
+### 修复
+
+- **模型自动获取写错上下文窗口大小**：`inferModelParameters` 按模型 ID 的本地推断表
+  存在子串误判——`glm-5` 分支排在 `glm-5.2` 之后，`glm-5.3` 含 "glm-5" 即命中，
+  被猜成 200000。这个猜测值会作为个人覆盖写入，反而盖住 Host 推荐规则表
+  （`config/provider/zcode-builtin.json` 中 `glm-5.3` = 1000000）的正确基线，
+  表现为「上游支持 1M、获取出来却是 200k」。现在只落地上游 API 确实返回过的字段，
+  缺省字段交回 Host 的 `ModelConfigRules.resolve` 按 `modelMatch` 解析；
+  同时移除 `inferModelParameters`，避免本地同义表随上游发版静默漂移。
+- **上游同步工作流每小时必然失败**：`has_updates` 直接比较 `upstream/main` 与 `HEAD`
+  的 tip，而 fork 的 `main` 永远比上游多出二开提交，于是每小时都判定「有更新」；
+  判定有更新后又对 `patches/0NN-*.patch` 执行 `git apply`，而那些改动早已是 `main`
+  上的普通提交，apply 必然报 `already exists` / `does not apply`。现在改用
+  `git rev-list --count HEAD..upstream/main` 判断上游是否真的前进，并去掉补丁重放。
+
+### 变更
+
+- 移除 `patches/001-subagent-model-chain.patch`、`patches/002-update-source-fix.patch`
+  两个二开内容快照（它们没有任何构建配置引用，只被上述已修复的同步步骤使用）。
+  `patches/` 目录现在只存放 pnpm `patchedDependencies` 的依赖补丁，说明见 `patches/README.md`。
+- 版本号从 `3.15.1` 提升到 `3.15.3`，使构建产物名（`ZCode.Preview-<version>-win-x64.exe`）
+  与已发布的旧包区分开。
+
 ## [3.15.2] - 2026-10-14
 
 ### 新增功能
