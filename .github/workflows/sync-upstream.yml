@@ -34,9 +34,13 @@ jobs:
         run: |
           UPSTREAM_SHA=$(git rev-parse upstream/main)
           CURRENT_SHA=$(git rev-parse HEAD)
+          # fork 的 main 始终比上游多出二开提交，直接比较两个 tip 会永远判定「有更新」，
+          # 于是每小时都跑一遍无意义的同步。这里只判断上游是否存在 HEAD 还没有的提交。
+          PENDING=$(git rev-list --count HEAD..upstream/main)
           echo "upstream_sha=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
           echo "current_sha=$CURRENT_SHA" >> $GITHUB_OUTPUT
-          if [ "$UPSTREAM_SHA" == "$CURRENT_SHA" ]; then
+          echo "pending_commits=$PENDING" >> $GITHUB_OUTPUT
+          if [ "$PENDING" -eq 0 ]; then
             echo "has_updates=false" >> $GITHUB_OUTPUT
           else
             echo "has_updates=true" >> $GITHUB_OUTPUT
@@ -45,35 +49,18 @@ jobs:
       - name: Sync upstream
         if: steps.check.outputs.has_updates == 'true'
         run: |
-          # 备份二开补丁。只备份 patches/0NN-*.patch（二开补丁命名约定，
-          # 见 patches/README.md），避免误用 pnpm patchedDependencies 的依赖补丁
-          #（如 patches/vitest@*.patch、patches/@arms__*.patch）。
-          mkdir -p /tmp/custom-patches
-          if compgen -G "patches/0*.patch" > /dev/null 2>&1; then
-            cp patches/0*.patch /tmp/custom-patches/
-          fi
-
-          # 自动合并上游代码，保留本地历史与补丁文件。冲突时中止并退出，
+          # 二开改动本身就是 main 上的普通提交，`git merge` 会自动保留；
+          # 这里不再重新应用 patches/0NN-*.patch —— 那些改动已经在工作树里，
+          # `git apply` 只会报 "already exists / patch does not apply"，让同步每次都失败。
+          # patches/ 目录仅作为二开内容的存档快照，不参与同步流程。
+          #
+          # 自动合并上游代码，保留本地历史。冲突时中止并退出，
           # 由下方 failure() 步骤创建 Issue 通知人工处理。
           git merge upstream/main --no-edit || {
             echo "Merge conflict with upstream"
             git merge --abort
             exit 1
           }
-
-          # 恢复并应用二开补丁（merge 快进时补丁文件可能被上游版本覆盖）
-          if compgen -G "/tmp/custom-patches/*.patch" > /dev/null 2>&1; then
-            for patch in /tmp/custom-patches/*.patch; do
-              echo "Applying $patch"
-              git apply "$patch" --3way || {
-                echo "Conflict applying $patch"
-                exit 1
-              }
-              # 补丁文件原样放回 patches/，供下次同步继续复用
-              mkdir -p patches
-              cp "$patch" "patches/$(basename "$patch")"
-            done
-          fi
 
           # 提交变更并推送（非 force，避免覆盖他人/历史提交）
           git add .
