@@ -57,7 +57,17 @@ jobs:
           ZCODE_SKIP_REMOTE_ASSETS: "1"
 
       - name: Build production bundles
-        run: pnpm --filter @zcode/desktop run build:no-runtime-assets
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @zcode/desktop run build:no-runtime-assets 2>&1 | tee /tmp/build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            # 用 GitHub workflow command 生成 annotation —— annotation 无需登录即可查看
+            TAIL=$(tail -40 /tmp/build.log | tr '\n' '~' | sed 's/%~/ /g' | cut -c1-4000)
+            echo "::error title=Build Failed::${TAIL}"
+            exit $STATUS
+          fi
         env:
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
