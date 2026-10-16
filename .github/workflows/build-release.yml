@@ -40,11 +40,10 @@ jobs:
           pnpm --version
 
       - name: Install dependencies
-        run: |
-          pnpm install --no-frozen-lockfile --fetch-retries=5 --fetch-timeout=120000 --reporter=append-only || {
-            echo "First install failed, trying with --force..."
-            pnpm install --force --no-frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
-          }
+        # 必须用 --frozen-lockfile：--no-frozen-lockfile 会让 pnpm 重新解析依赖图，
+        # 丢掉 lockfile 里的 overrides（react 版本锁定）和全部 patchedDependencies 补丁，
+        # 生成损坏的依赖树（esbuild JS 库与平台二进制版本错配），导致 tsup/tsx 直接崩溃。
+        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
 
       - name: Print tool versions
         run: |
