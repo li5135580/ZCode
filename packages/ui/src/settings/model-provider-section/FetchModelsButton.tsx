@@ -3,7 +3,6 @@ import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 import type { ModelConfigObject, ProviderApiType } from "@zcode/provider";
 import {
   fetchProviderModels,
-  inferModelParameters,
   resolveModelParameters,
   type FetchedModelInfo,
 } from "@zcode/services";
@@ -30,25 +29,27 @@ import type { ProviderSettingsFormModel } from "@/lib/providerSettingsFormTypes.
 /**
  * 把「获取到的模型信息」折算成可提交的稀疏 Personal Model 配置。
  *
- * 只写入确有来源的字段：API 返回的元数据，或 `inferModelParameters` 按模型 ID 命中的内置规则。
- * 两者都没有的字段保持缺省，交给 Host 的推荐配置基线解析，避免用兜底默认值
- * （如统一的 200000 / 32000）把推荐配置固化成个人覆盖。
+ * 只写入**上游 API 确实返回过**的字段。缺失的字段一律保持缺省，交给 Host 的推荐配置
+ * 基线解析（`ModelConfigRules.resolve` 按 `modelMatch` 匹配 `zcode-builtin.json`）。
+ *
+ * 这里刻意不按模型 ID 做本地推断：本地推断表会在上游新增/调整模型时静默漂移，
+ * 一旦写入就成了个人覆盖，反而盖住 Host 更准确的基线——典型例子是 glm-5.3 被本地
+ * 误判成 200000，而 Host 规则给出 1000000。
  *
  * `reasoningLevels` 不在此处落地：枚举档位必须同时给出 CEL 映射表达式，
  * 而映射与具体供应商接口相关，只能由推荐配置提供。
  */
 export function resolveFetchedModelPersonalConfig(model: FetchedModelInfo): ModelConfigObject {
-  const inferred = inferModelParameters(model.modelId);
-  const resolved = resolveModelParameters(model, inferred);
+  const resolved = resolveModelParameters(model);
   const properties: Record<string, unknown> = {};
   const optionSpecs: Record<string, unknown> = {};
-  if (model.contextWindow !== undefined || inferred.contextWindow !== undefined) {
+  if (model.contextWindow !== undefined) {
     properties.contextWindow = resolved.contextWindow;
   }
-  if (model.inputFormat !== undefined || inferred.inputFormat !== undefined) {
+  if (model.inputFormat !== undefined) {
     properties.inputFormat = { ...resolved.inputFormat };
   }
-  if (model.maxOutputTokens !== undefined || inferred.maxOutputTokens !== undefined) {
+  if (model.maxOutputTokens !== undefined) {
     optionSpecs.maxOutputTokens = { max: resolved.maxOutputTokens };
   }
   return {
