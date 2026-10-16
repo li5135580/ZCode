@@ -55,12 +55,15 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
-          LOG=/tmp/build.log
+          # 注意：Windows runner 上 /tmp 不跨 step 保留，日志必须写到工作区内
+          LOG="$GITHUB_WORKSPACE/build.log"
           : > "$LOG"
-          echo "=== desktop build ===" | tee -a "$LOG"
-          pnpm --filter @zcode/desktop run build 2>&1 | tee -a "$LOG"
-          echo "=== electron-builder bundle ===" | tee -a "$LOG"
-          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64 2>&1 | tee -a "$LOG"
+          {
+            echo "=== desktop build ==="
+            pnpm --filter @zcode/desktop run build
+            echo "=== electron-builder bundle ==="
+            pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+          } 2>&1 | tee "$LOG"
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
@@ -92,7 +95,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          LOG=/tmp/build.log
+          LOG="$GITHUB_WORKSPACE/build.log"
           if [ ! -f "$LOG" ]; then echo "no build.log to publish"; exit 0; fi
           rm -rf /tmp/logrepo && mkdir -p /tmp/logrepo && cd /tmp/logrepo
           git init -q
