@@ -23,8 +23,8 @@ origin	https://github.com/xyiford/ZCode.git (push)      # 推送：到副账号
 # 一次推送，同时更新两个仓库
 git push origin main
 
-# 推送 tag
-git push origin v3.15.2
+# 推送 tag（tag 命名见 CHANGELOG：仓库 package.json 版本与上游对齐，fork 构建用 tag 区分）
+git push origin v3.15.1-fork.2
 ```
 
 ### 拉取更新
