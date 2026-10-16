@@ -14,3 +14,8 @@ third-party/runtime/*.txt -text -whitespace
 docs/knip/docs/LICENSE -text -whitespace
 docs/knip/docs/licenses/** -text -whitespace
 third-party/inventory.json linguist-generated=true
+
+# Gen UI vendor 快照在构建期按 manifest.json 的 sha256 逐字节校验，
+# 任何换行转换（LF→CRLF）都会改变哈希并直接让 tsup/vite 构建失败。
+# Windows 上 core.autocrlf=true 时 checkout 会转 CRLF，必须显式按二进制保存。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text -whitespace
