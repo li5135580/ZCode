@@ -54,16 +54,27 @@ jobs:
       - name: Build installer
         shell: bash
         run: |
-          set -eo pipefail
-          # 注意：Windows runner 上 /tmp 不跨 step 保留，日志必须写到工作区内
           LOG="$GITHUB_WORKSPACE/build.log"
           : > "$LOG"
-          {
-            echo "=== desktop build ==="
-            pnpm --filter @zcode/desktop run build
-            echo "=== electron-builder bundle ==="
-            pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
-          } 2>&1 | tee "$LOG"
+          exec > >(tee -a "$LOG") 2>&1
+
+          echo "=== [1/2] desktop build ==="
+          pnpm --filter @zcode/desktop run build
+          RC_BUILD=$?
+          echo "=== desktop build exit code: $RC_BUILD ==="
+          if [ "$RC_BUILD" -ne 0 ]; then
+            echo "::error title=desktop build failed (exit $RC_BUILD)::pnpm run build 失败，见 ci-logs 分支"
+            exit "$RC_BUILD"
+          fi
+
+          echo "=== [2/2] electron-builder bundle ==="
+          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+          RC_BUNDLE=$?
+          echo "=== bundle exit code: $RC_BUNDLE ==="
+          if [ "$RC_BUNDLE" -ne 0 ]; then
+            echo "::error title=bundle failed (exit $RC_BUNDLE)::electron-builder 打包失败，见 ci-logs 分支"
+            exit "$RC_BUNDLE"
+          fi
         env:
           ZCODE_UPDATE_FEED_URL: ${{ secrets.UPDATE_FEED_URL || '' }}
           ZCODE_SKIP_REMOTE_ASSETS: "1"
@@ -103,7 +114,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           {
             printf '# Build log\n\ncommit %s\n\n```\n' "${{ github.sha }}"
-            tail -600 "$LOG"
+            # 同时保留开头和结尾，便于定位失败点（vite 输出会占满 tail）
+            head -150 "$LOG"
+            printf '\n... (中间省略) ...\n\n'
+            tail -800 "$LOG"
             printf '\n```\n'
           } > build-log.md
           git add build-log.md
