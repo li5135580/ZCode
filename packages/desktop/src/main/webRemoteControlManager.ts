@@ -40,6 +40,7 @@ import {
   type RemoteUsageRemoteKind,
   type TelemetryEventPayload,
   measureWebRemoteControlRpcRelayEnvelopeBytes,
+  resolveWebRemoteControlEntryAppVersion,
 } from "@zcode/shared";
 import {
   WebRemoteControlDeviceTransport,
@@ -770,7 +771,12 @@ export function createWebRemoteControlManager(dependencies: WebRemoteControlMana
   ): WebRemoteControlWindowBootstrapResult {
     return {
       windowControlSessionId: runtime.deviceSid,
-      desktopAppVersion: dependencies.appVersion,
+      // 必须与二维码里的 app_version 同形态：手机页面在版本不一致时会整页 replace 到
+      // 带真实版本号的 URL，而入口对 prerelease 版本返回 404，页面会白屏。
+      // relay 注册用的 meta.version 仍保留真实版本，不受此处影响。
+      desktopAppVersion:
+        resolveWebRemoteControlEntryAppVersion(dependencies.appVersion) ??
+        dependencies.appVersion,
       workspaces: getAvailableWorkspaces(runtime),
       tasks: getAvailableTasks(runtime),
       initialViewState: getRuntimeInitialViewState(runtime),

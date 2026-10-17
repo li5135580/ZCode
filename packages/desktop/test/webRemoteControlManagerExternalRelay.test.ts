@@ -47,6 +47,7 @@ function createManagerHarness(options?: {
   reportRemoteUsageEvent?: Parameters<
     typeof createWebRemoteControlManager
   >[0]["reportRemoteUsageEvent"];
+  appVersion?: string;
 }) {
   const sentPayloads: WebRemoteControlAppPayload[] = [];
   const logger = {
@@ -89,7 +90,7 @@ function createManagerHarness(options?: {
     getEndpointUrls: options?.getEndpointUrls,
     deviceMid: "mid-1",
     deviceName: "MacBook",
-    appVersion: "1.5.0",
+    appVersion: options?.appVersion ?? "1.5.0",
     authProvider: {
       createPassword: () => "password",
       createPassHash: () => "hash-1",
@@ -303,6 +304,23 @@ describe("createWebRemoteControlManager external relay", () => {
       }),
     );
     expect(h.defaultAttachWorkspaceHost).not.toHaveBeenCalled();
+    await h.manager.stop(1);
+  });
+
+  it("bootstrap 里的 desktopAppVersion 去掉 prerelease 后缀", async () => {
+    // 手机页面会拿这个值和 URL 里的 app_version 比对，不一致就整页 replace。
+    // 而远程控制入口拒绝带 prerelease 的 app_version（返回 404），所以这里必须给
+    // major.minor.patch，否则二开构建（如 3.15.2-fork.3）一连上就会白屏。
+    const h = createManagerHarness({ appVersion: "3.15.2-fork.3" });
+    await h.manager.start(1, { workspacePath: localWorkspace.workspacePath });
+    h.deliverPayload({ zcode_type: "bootstrap-request", requestId: "version-check" });
+    expect(h.sentPayloads).toContainEqual(
+      expect.objectContaining({
+        zcode_type: "bootstrap-response",
+        requestId: "version-check",
+        result: expect.objectContaining({ desktopAppVersion: "3.15.2" }),
+      }),
+    );
     await h.manager.stop(1);
   });
   afterEach(() => {
