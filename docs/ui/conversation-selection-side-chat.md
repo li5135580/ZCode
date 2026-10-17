@@ -110,13 +110,19 @@ Side Pane 启动页 / 顶部 + 菜单 / 主 composer `/side`、`/btw`
   仍产生入口。跨 row、纯空白和已经卸载的虚拟行不产生入口。
 - 滚动、Esc、选区折叠、切任务和进入主会话阻塞态关闭浮层。
 - `ConversationSelectionReference` 包含 `id`、`sourceSessionId`、`sourceRowId`、
-  `contentType` 与原始 `text`。去重键包含全部来源字段和文本；不同 row 的相同文字不是重复。
-- 单条最多 8,000 字符、每个 composer 最多 8 条、总计最多 16,000 字符。超限原子拒绝并
-  显示本地化提示，不截断、不清除已有引用或草稿。
+  `contentType`、原始 `text` 与可选的 `comment`（用户对该处选区的纠偏批注）。去重键包含全部
+  来源字段和文本、**不含** `comment`；不同 row 的相同文字不是重复，同源同文再次添加时更新
+  已有条目的 `comment` 而不是追加重复引用。
+- 单条正文最多 8,000 字符、单条批注最多 2,000 字符、每个 composer 最多 20 条、
+  总计最多 32,000 字符（正文与批注合并计量）。超限原子拒绝并显示本地化提示，
+  不截断、不清除已有引用或草稿。
+- 选区浮层提供两个添加入口：直接「添加到当前任务」，或「添加批注」后在内联输入框写明
+  这处需要怎么改再添加。批注输入框聚焦会折叠文档选区，因此展开期间冻结当前选区快照。
+  一轮输出里的多处偏差可分别批注，最终作为同一个 `conversationQuotes` 数组一次性发送。
 - 发送前的 composer reference 继续保留完整来源字段，用于精确去重、限制与待发送 hover；发送时只把
-  `{ text }` 数组追加到 `# userselect:`、语言标签为 `userselect` 的结构块，避免把 session、row、content type
-  和内部 id 暴露给模型。timeline 解析后仅显示正文与引用 chips，已发送 chip 的 hover 只展示已持久化
-  的选中文字。
+  `{ text, path?, comment? }` 数组追加到 `# userselect:`、语言标签为 `userselect` 的结构块，
+  避免把 session、row、content type 和内部 id 暴露给模型。timeline 解析后仅显示正文、批注与
+  引用 chips，已发送 chip 的 hover 只展示已持久化的选中文字与批注。
 - 旧 `# Conversation selections:`、语言标签为 `zcode-conversation-selections` 的完整结构块继续只读解析，保证
   既有历史 chip 可见；新消息不再写旧格式，也不迁移已落盘消息。与 Web element context 同时存在时，
   先解析末尾 Web element block，再解析 selection block。
@@ -126,7 +132,7 @@ Side Pane 启动页 / 顶部 + 菜单 / 主 composer `/side`、`/btw`
 ````text
 # userselect:
 ```userselect
-[{"text":"云计算"}]
+[{"text":"云计算"},{"text":"上下文窗口写错了","comment":"这里应该是 1M 而不是 200k"}]
 ```
 ````
 

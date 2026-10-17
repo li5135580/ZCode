@@ -17,9 +17,14 @@
 
 ### 1. Subagent Multi-Model Chain Support
 
-- **Multi-Model Binding**: Each subagent supports binding up to 3 models (1 primary + 2 fallbacks)
+- **Multi-Model Binding**: Each subagent can configure any number of fallback models
+  (no product limit, 20 as a safety cap)
+- **Primary Model Reuse**: When the model chain is enabled, the primary model comes from the
+  Model field above; the chain only configures fallbacks
+- **Drag to Reorder**: Fallbacks are tried top to bottom; drag the handle or use the
+  move up/down buttons to change priority
 - **Independent Reasoning Levels**: Each model can have its own reasoning level
-- **Smart Fallback**: Execute in order, automatically switch to fallback after 5 failures
+- **Smart Fallback**: Execute in order, automatically switch to the next fallback after 5 failures
 - **Main Agent Fallback**: Falls back to main agent when all models fail
 
 **Configuration Example** (Markdown frontmatter):
@@ -46,20 +51,36 @@ modelChain:
 
 ### 2. Automatic Model Fetching
 
-- **Auto-fetch Upstream Models**: Automatically fetch model lists from OpenAI, Anthropic, Z.AI, and other providers
-- **Auto-detect Parameters**: Automatically detect model parameters like contextWindow, maxOutputTokens, reasoningLevel
+- **Auto-fetch Upstream Models**: Automatically fetch model lists from [OI], Anthropic, Z.AI,
+  and other providers
+- **Capability Metadata First**: When `/models` returns `context_length`,
+  `max_completion_tokens`, or `architecture.input_modalities`, those values are used directly
+  (strictly type-checked; invalid values are ignored)
+- **Variant Name Recognition**: The host rule table covers hyphenated names (`gpt-5-6-*`),
+  `-preview` suffixes, explicit `[1m]` declarations, `claude-4` / `claude-3.5`,
+  `qwen3-vl-flash`, and similar variants
 - **One-click Add**: Add fetched models with one click in the model settings page
 
-### 3. GitHub Actions Auto Sync & Release
+### 3. Multi-Spot Annotations
 
-- **Auto Sync Upstream**: Check upstream repository updates hourly, auto-merge and apply custom patches
-- **Auto Build & Release**: Automatically build multi-platform packages (Windows, macOS, Linux) and release on push
-- **Conflict Notification**: Automatically create Issue when merge conflicts occur
+- **Per-quote notes**: Select part of an assistant reply and choose "Add with note" to describe
+  what should change there
+- **Annotate several spots**: Mark multiple deviations in one turn, then send them together as
+  a single message
+- **Edit before sending**: Each note can be edited or removed in the composer's quote list
 
-### 4. Custom Update Source
+### 4. GitHub Actions Auto Sync & Release
 
-- **Update Source Switch**: Client update detection source switched to this repository's GitHub Releases
-- **Environment Variable Override**: Support custom update source via `ZCODE_UPDATE_FEED_URL` environment variable
+- **Auto Sync Upstream**: Check upstream for new commits hourly and merge them automatically
+  (custom commits are preserved by git)
+- **Auto Build & Release**: Automatically build packages (Windows, macOS, Linux) and publish on push
+- **Conflict Notification**: Automatically create an Issue when merge conflicts occur
+
+### 5. Custom Update Source & Manual Check
+
+- **Update Source Switch**: Client update detection source points at this repository's GitHub Releases
+- **Manual Check**: Available from the app menu, tray, and Help menu — including the Preview build
+- **Environment Variable Override**: Support custom update source via `ZCODE_UPDATE_FEED_URL`
 
 ---
 
@@ -87,9 +108,13 @@ official package), so the enhanced features are already included:
   choose "More info → Run anyway". If you run third-party antivirus software (e.g. Huorong),
   the first launch can be slower than usual while it scans the newly written files — this is
   expected.
-- **Auto-update is disabled under the Preview identity** by upstream design
-  (`ZCODE_PRODUCT_FLAVOR === "production"` is required to enable it). To upgrade, download
-  the newer installer and install over the existing version.
+- **Auto-update works**: the update feed points at this repository's Releases and can be
+  checked manually from the app menu, tray, or Help menu. The installer version is injected at
+  build time (`<upstream patch+1>-fork.N`), so it is strictly increasing in semver terms and
+  installed clients receive updates normally.
+- **Upgrading from a 3.15.1 build needs one manual step**: that build's updater was never
+  initialized, so download the new installer and install over it. Auto-update takes effect
+  from that version onward.
 
 ### Option 2: Build from Source
 
@@ -125,6 +150,10 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 
 ## Updates
 
+- 2026-10-17 (fork.3): Model chain layout (primary comes from the Model field, fallbacks only,
+  drag to reorder, no fixed 2-model limit); model capability metadata parsing plus host rule
+  fixes for variant names; manual update check restored with `latest.yml` publishing;
+  per-quote annotations for multi-spot corrections.
 - 2026-10-17: Fixed "fetch model list" writing a wrong context window size (glm-5.3 was
   recorded as 200k while it is actually 1M), and fixed the upstream sync workflow failing
   every hour.

@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | ARMS RUM 上报 | `ZCODE_ARMS_RUM_ENDPOINT` | 主进程与渲染进程的 ARMS SDK 以 `enable: false` 初始化，不产生上报 |
 | 事件上报（数仓） | `ZCODE_TELEMETRY_REPORT_ENDPOINT` | 遥测事件在发送前直接返回 |
-| 自动更新 | `ZCODE_AUTO_UPDATE`（`1`、`true`、`yes` 为启用） | 与 Preview 形态相同，不检查、不下载更新 |
+| 自动更新 | `ZCODE_AUTO_UPDATE`（`1`、`true`、`yes` 为启用） | 不检查、不下载更新，手动检查入口也一并隐藏 |
 
 这样同一份源码可以产出“默认不上报、不自动更新”的构建，也可以产出启用这些能力的正式构建，
 不需要在源码里写死上报地址。
@@ -32,7 +32,11 @@ desktop tsup（main、host、preload）与 desktop vite（renderer）的 define
 ```
 
 - 未注入 define 的环境（测试、其他 bundle）得到关闭值；vitest 为测试注入固定的事件上报端点，以便验证上报链路。
-- 自动更新在 Desktop Main 启动时判定：`ZCODE_PRODUCT_FLAVOR === "production" && ZCODE_AUTO_UPDATE_ENABLED`。
+- 自动更新在 Desktop Main 启动时判定，只由构建期能力开关决定：`ZCODE_AUTO_UPDATE_ENABLED`。
+  产品身份（`ZCODE_PRODUCT_FLAVOR`）不参与该判断——二开的 Preview 身份安装包同样需要
+  从 fork 的 `latest.yml` 检查更新。手动检查入口的可见性跟随同一个开关。
+- 更新源默认指向二开仓库的 GitHub Releases（`DEFAULT_UPDATE_FEED_URL`），
+  运行时可用 `ZCODE_UPDATE_FEED_URL` 覆盖。
 - Agent 的 OTLP 遥测沿用既有机制，由打包环境的 `ZCODE_PACKAGED_AGENT_OTEL_*` 注入，不在本文件范围内。
 
 ## 验收
