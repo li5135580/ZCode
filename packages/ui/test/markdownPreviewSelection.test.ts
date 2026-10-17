@@ -87,6 +87,10 @@ describe("Markdown preview selections", () => {
   it("触控选区添加到明确的远程草稿 scope，不串同路径 workspace", async () => {
     render(preview());
     fireEvent.click(await selectText("selectionchange"));
+    // 主按钮现在先展开批注框；点「跳过」才真正把引用写进草稿 scope。
+    fireEvent.click(
+      document.querySelector('[data-conversation-selection-action="annotation-skip"]')!,
+    );
     expect(getConversationSelectionReferenceScope(null, target.workspaceKey)).toMatchObject([
       { text: reference.text, contentType: "markdown", path: "/workspace/a.md" },
     ]);

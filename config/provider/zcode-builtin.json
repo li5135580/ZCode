@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 31,
+  "revision": 32,
   "config": {
     "providerConfigRules": {
       "templateRules": [
@@ -1660,6 +1660,29 @@
         },
         {
           "modelMatch": ".*grok-4\\.6(?:[.\\-:/\\[].*)?",
+          "config": {
+            "properties": {
+              "contextWindow": 500000,
+              "inputFormat": {
+                "supportsImage": true,
+                "supportsVideo": false,
+                "supportsAudio": false,
+                "supportsPdf": false
+              },
+              "supportsJsonSchemaOutput": true
+            },
+            "optionSpecs": {
+              "reasoningLevel": {
+                "values": ["low", "medium", "high", "xhigh"]
+              },
+              "maxOutputTokens": {
+                "max": 128000
+              }
+            }
+          }
+        },
+        {
+          "modelMatch": ".*grok-4[.-]7(?:[.\\-:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 500000,

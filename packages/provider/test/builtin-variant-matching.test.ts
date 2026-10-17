@@ -99,4 +99,23 @@ describe("内置模型规则的变体命名覆盖", () => {
     expect(resolved.properties?.inputFormat?.supportsImage).toBe(true);
     expect(resolved.properties?.contextWindow).toBe(262_144);
   });
+
+  it("grok-4.7 的点号与连字符写法都命中专用规则", async () => {
+    const rules = await loadBuiltinRules();
+
+    // 此前规则表只有 grok-4.3 / 4.6 / build-0.1，grok-4.7 会落到兜底 `.*`
+    // → 200k / 32k / 纯文本 / disabled+enabled，与官方规格完全不符。
+    for (const modelId of ["grok-4.7", "grok-4-7"]) {
+      const resolved = resolveModel(rules, modelId);
+      expect(resolved.properties?.contextWindow).toBe(500_000);
+      expect(resolved.optionSpecs?.maxOutputTokens?.max).toBe(128_000);
+      expect(resolved.properties?.inputFormat?.supportsImage).toBe(true);
+      expect(resolved.optionSpecs?.reasoningLevel?.values).toEqual([
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+      ]);
+    }
+  });
 });

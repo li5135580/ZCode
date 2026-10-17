@@ -173,8 +173,14 @@ export function SelectionActionMenu({
                 : null}
             </span>
             <div className="flex shrink-0 items-center gap-1">
-              <Button type="button" size="sm" variant="ghost" onClick={closeAnnotation}>
-                {intl.formatMessage({ id: "chat.selections.annotationCancel" })}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                data-conversation-selection-action="annotation-skip"
+                onClick={() => submit("")}
+              >
+                {intl.formatMessage({ id: "chat.selections.annotationSkip" })}
               </Button>
               <Button
                 type="button"
@@ -194,22 +200,15 @@ export function SelectionActionMenu({
             type="button"
             data-conversation-selection-action="add-to-task"
             className="min-w-0 px-2.5 py-1.5 hover:bg-menu-hover"
-            onClick={() => onAddToCurrentTask()}
-          >
-            {intl.formatMessage({ id: "chat.selections.addToTask" })}
-          </button>
-          <div className="w-px shrink-0 bg-border" />
-          <button
-            type="button"
-            data-conversation-selection-action="add-annotation"
-            className="min-w-0 px-2.5 py-1.5 hover:bg-menu-hover"
             onClick={() => {
-              // 同步冻结宿主选区快照：Textarea 聚焦后文档选区会立即折叠。
+              // 点主按钮先展开批注框，而不是直接提交：批注是「添加到当前任务」的可选补充，
+              // 展开后既能写批注再提交，也能直接点「跳过」保持原来的一键添加语义。
+              // 必须先冻结宿主选区快照，Textarea 聚焦会让文档选区立即折叠。
               onAnnotationOpenChange?.(true);
               setAnnotating(true);
             }}
           >
-            {intl.formatMessage({ id: "chat.selections.addAnnotation" })}
+            {intl.formatMessage({ id: "chat.selections.addToTask" })}
           </button>
           <div className="w-px shrink-0 bg-border" />
           <button

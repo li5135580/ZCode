@@ -1085,6 +1085,7 @@ const zhCN: Record<string, string> = {
   "chat.selections.annotationPlaceholder": "说明这处需要怎么改（可选）",
   "chat.selections.annotationConfirm": "添加到当前任务",
   "chat.selections.annotationCancel": "取消",
+  "chat.selections.annotationSkip": "跳过，直接添加",
   "chat.selections.annotationLabel": "批注",
   "chat.selections.annotationEdit": "编辑批注",
   "chat.selections.annotationEmpty": "未填写批注",

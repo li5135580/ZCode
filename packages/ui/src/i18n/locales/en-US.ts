@@ -1174,6 +1174,7 @@ const enUS: Record<string, string> = {
   "chat.selections.annotationPlaceholder": "Describe what should change here (optional)",
   "chat.selections.annotationConfirm": "Add to chat",
   "chat.selections.annotationCancel": "Cancel",
+  "chat.selections.annotationSkip": "Skip and add",
   "chat.selections.annotationLabel": "Note",
   "chat.selections.annotationEdit": "Edit note",
   "chat.selections.annotationEmpty": "No note",
