@@ -131,6 +131,7 @@ import {
 } from "@/v4/composer/composerPromptContexts.js";
 import { WebElementContextAttachmentChip } from "@/v4/composer/WebElementContextAttachmentChip.js";
 import { ConversationSelectionReferenceChip } from "@/v4/composer/ConversationSelectionReferenceChip.js";
+import { toConversationQuote } from "@/lib/conversationSelectionReference.js";
 import { PptxElementReferenceChip } from "@/v4/composer/PptxElementReferenceChip.js";
 import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementReference.js";
 import { ConversationFileRewindDialog } from "@/v4/ConversationFileRewindDialog.js";
@@ -1096,7 +1097,10 @@ const SingleUserInputRowView = memo(function SingleUserInputRowView({
           editAttachments,
           workspaceMode,
           ...(parsedPrompt.conversationSelections.length || row.conversationQuotes
-            ? [[...editPromptContexts.conversationSelections]]
+            ? [
+                // 编辑态同样走白名单：批注保留，内部来源字段不离开 renderer。
+                editPromptContexts.conversationSelections.map(toConversationQuote),
+              ]
             : []),
         );
         if (

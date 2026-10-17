@@ -13,8 +13,8 @@ import {
   PlatformChannels,
   resolveHelpAppConfig,
   resolveZCodeEndpointOrigin,
+  ZCODE_AUTO_UPDATE_ENABLED,
   ZCODE_ENV,
-  ZCODE_PRODUCT_FLAVOR,
   type AppSettings,
   type DesktopCommandId,
   type Locale,
@@ -593,11 +593,12 @@ export async function executeDesktopCommand(options: {
       );
       return;
     case DesktopCommandIds.CheckForUpdates:
-      // 按产品身份而不是后端环境放行：生产后端的 Preview 同样没有更新器。
-      if (ZCODE_PRODUCT_FLAVOR === "production") {
+      // 是否允许检查更新由构建期能力开关决定，不再按产品身份拦截：
+      // 二开包（Preview 身份）也需要手动检测 GitHub Release 更新。
+      if (ZCODE_AUTO_UPDATE_ENABLED) {
         checkForUpdateMenuClick(targetWindow);
       } else {
-        options.logger.info("[auto-update] Preview 已禁用手动更新检查");
+        options.logger.info("[auto-update] 当前构建未启用自动更新，忽略手动检查");
       }
       return;
     case DesktopCommandIds.RelaunchApp:

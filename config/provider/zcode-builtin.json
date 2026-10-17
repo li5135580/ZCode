@@ -944,14 +944,6 @@
           }
         },
         {
-          "modelMatch": ".*\\[1m\\]",
-          "config": {
-            "properties": {
-              "contextWindow": 1000000
-            }
-          }
-        },
-        {
           "modelMatch": ".*(?:ox-alpha|glm-x-preview-f|x-preview-f-free).*",
           "config": {
             "optionSpecs": {
@@ -1042,7 +1034,7 @@
           }
         },
         {
-          "modelMatch": ".*glm-5\\.3-flash(?:[.\\-:/\\[].*)?",
+          "modelMatch": ".*glm-5\\.3-flashx?(?:[.\\-:/\\[].*)?",
           "config": {
             "properties": {
               "inputFormat": {
@@ -1421,7 +1413,7 @@
           }
         },
         {
-          "modelMatch": ".*gpt-5\\.6(?:-(?:sol|terra|luna))?(?:[.\\-:/\\[].*)?",
+          "modelMatch": ".*gpt-5[.-]6(?:[.-](?:sol|terra|luna))?(?:[.\\-:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1050000,
@@ -1490,7 +1482,7 @@
           }
         },
         {
-          "modelMatch": ".*gpt-5\\.4(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*gpt-5\\.4(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1050000,
@@ -1513,7 +1505,7 @@
           }
         },
         {
-          "modelMatch": ".*gpt-5\\.4-pro(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*gpt-5\\.4-pro(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1050000,
@@ -1536,7 +1528,7 @@
           }
         },
         {
-          "modelMatch": ".*gpt-5\\.4-mini(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*gpt-5\\.4-mini(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 400000,
@@ -1559,7 +1551,7 @@
           }
         },
         {
-          "modelMatch": ".*gpt-5\\.4-nano(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*gpt-5\\.4-nano(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 400000,
@@ -1600,6 +1592,25 @@
               },
               "maxOutputTokens": {
                 "max": 128000
+              }
+            }
+          }
+        },
+        {
+          "modelMatch": ".*claude-(?:4|3\\.5)(?:[.-](?:opus|sonnet|haiku))?(?:[.\\-:/\\[].*)?",
+          "config": {
+            "properties": {
+              "contextWindow": 200000,
+              "inputFormat": {
+                "supportsImage": true,
+                "supportsVideo": false,
+                "supportsAudio": false,
+                "supportsPdf": true
+              }
+            },
+            "optionSpecs": {
+              "maxOutputTokens": {
+                "max": 64000
               }
             }
           }
@@ -2273,7 +2284,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3-vl-plus(?:[.\\-:/\\[].*)?",
+          "modelMatch": ".*qwen3-vl-(?:plus|flash)(?:[.\\-:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 262144,
@@ -2294,7 +2305,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.7-max(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.7-max(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1000000,
@@ -2315,7 +2326,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.7-plus(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.7-plus(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1000000,
@@ -2336,7 +2347,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.7-flash(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.7-flash(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1000000,
@@ -2357,7 +2368,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.6-plus(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.6-plus(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1000000,
@@ -2378,7 +2389,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.6-flash(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.6-flash(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 1000000,
@@ -2410,7 +2421,7 @@
           }
         },
         {
-          "modelMatch": ".*qwen3\\.8-omni-flash(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+          "modelMatch": ".*qwen3\\.8-omni-flash(?:-20\\d{2}(?:-?\\d{2}){2}|-preview)?(?:[:/\\[].*)?",
           "config": {
             "properties": {
               "contextWindow": 65536,
@@ -2524,6 +2535,14 @@
               "maxOutputTokens": {
                 "max": 65536
               }
+            }
+          }
+        },
+        {
+          "modelMatch": ".*\\[1m\\]",
+          "config": {
+            "properties": {
+              "contextWindow": 1000000
             }
           }
         }

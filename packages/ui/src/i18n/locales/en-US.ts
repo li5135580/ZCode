@@ -1170,6 +1170,13 @@ const enUS: Record<string, string> = {
   "workflowDirectory.unavailable": "Workflow runs can't be listed for this conversation",
   "chat.selections.addToTask": "Add to chat",
   "chat.selections.askInSideChat": "Add in side chat",
+  "chat.selections.addAnnotation": "Add with note",
+  "chat.selections.annotationPlaceholder": "Describe what should change here (optional)",
+  "chat.selections.annotationConfirm": "Add to chat",
+  "chat.selections.annotationCancel": "Cancel",
+  "chat.selections.annotationLabel": "Note",
+  "chat.selections.annotationEdit": "Edit note",
+  "chat.selections.annotationEmpty": "No note",
   "chat.selections.sideBlocked":
     "Resolve the side conversation request before adding another selection.",
   "chat.selections.count": "{count} conversation selections",
@@ -1179,9 +1186,10 @@ const enUS: Record<string, string> = {
   "chat.selections.type.reasoning": "Reasoning",
   "chat.selections.type.tool": "Tool result",
   "chat.selections.limit.single": "A selection can contain at most 8,000 characters.",
-  "chat.selections.limit.count": "You can attach at most 8 conversation selections.",
+  "chat.selections.limit.count": "You can attach at most 20 conversation selections.",
   "chat.selections.limit.total":
-    "Conversation selections can contain at most 16,000 characters in total.",
+    "Conversation selections can contain at most 32,000 characters in total.",
+  "chat.selections.limit.comment": "A note can contain at most 2,000 characters.",
   "sidePane.openTabDescription": "Choose a tab to open in the side pane.",
   "sidePane.openFile": "Open file",
   "sidePane.openFileDescription": "Open a file from the current workspace in the side panel.",
@@ -4334,6 +4342,7 @@ const enUS: Record<string, string> = {
   "settings.subagents.modelChain.description":
     "Configure fallback models for the primary model; they are tried in order when it fails.",
   "settings.subagents.modelChain.primary": "Primary model",
+  "settings.subagents.modelChain.primaryFromAbove": "Primary model uses the Model field above",
   "settings.subagents.modelChain.primaryPlaceholder": "Select primary model",
   "settings.subagents.modelChain.primaryDescription": "The model tried first",
   "settings.subagents.modelChain.fallbacks": "Fallback models",
@@ -4341,6 +4350,11 @@ const enUS: Record<string, string> = {
   "settings.subagents.modelChain.fallbackPlaceholder": "Fallback model {index}",
   "settings.subagents.modelChain.fallbacksEmpty":
     "Fallback models are used when the primary model fails",
+  "settings.subagents.modelChain.fallbacksDescription":
+    "Tried top to bottom; drag to change the order.",
+  "settings.subagents.modelChain.dragHint": "Drag to reorder fallback models",
+  "settings.subagents.modelChain.moveUp": "Move fallback model {index} up",
+  "settings.subagents.modelChain.moveDown": "Move fallback model {index} down",
   "settings.subagents.modelChain.addFallback": "Add fallback model",
   "settings.subagents.modelChain.removeFallback": "Remove fallback model {index}",
   "settings.subagents.modelChain.retryCount": "Retry attempts",

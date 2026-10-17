@@ -8,6 +8,7 @@ const envMock = vi.hoisted(() => ({
   isPackaged: false,
   locale: "en-US",
   preferredSystemLanguages: [] as string[],
+  autoUpdateEnabled: true,
 }));
 
 vi.mock("electron", () => ({
@@ -102,6 +103,10 @@ vi.mock("@zcode/shared", () => ({
   get ZCODE_PRODUCT_FLAVOR() {
     return envMock.value === "production" ? "production" : "preview";
   },
+  // 更新入口改为跟随构建期能力开关，而不是产品身份。
+  get ZCODE_AUTO_UPDATE_ENABLED() {
+    return envMock.autoUpdateEnabled;
+  },
   getDesktopMenuMessage: (_locale: string, id: string) => {
     const enLabels: Record<string, string> = {
       "titleBar.menu.help.zcodeEndpoint": "ZCode Endpoint",
@@ -171,6 +176,7 @@ describe("desktopApplicationMenu endpoint submenu", () => {
     envMock.isPackaged = false;
     envMock.locale = "en-US";
     envMock.preferredSystemLanguages = [];
+    envMock.autoUpdateEnabled = true;
     buildFromTemplateMock.mockClear();
     setApplicationMenuMock.mockClear();
     getApplicationMenuMock.mockClear();
@@ -219,10 +225,11 @@ describe("desktopApplicationMenu endpoint submenu", () => {
     expect(findMenuItem(template, "ZCode Endpoint")).toBeUndefined();
   });
 
-  it("Preview 隐藏更新入口，生产版继续显示", async () => {
+  it("启用自动更新的构建展示更新入口，Preview 身份也一样", async () => {
     const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");
 
     envMock.value = "test";
+    envMock.autoUpdateEnabled = true;
     rebuildApplicationMenu({
       currentApplicationLocale: "en-US",
       executeDesktopCommand: vi.fn(),
@@ -230,7 +237,7 @@ describe("desktopApplicationMenu endpoint submenu", () => {
     let template = buildFromTemplateMock.mock.calls.at(
       -1,
     )?.[0] as Electron.MenuItemConstructorOptions[];
-    expect(findMenuItem(template, undefined, "check-for-update")).toBeUndefined();
+    expect(findMenuItem(template, undefined, "check-for-update")).toBeTruthy();
 
     envMock.value = "production";
     rebuildApplicationMenu({
@@ -241,6 +248,21 @@ describe("desktopApplicationMenu endpoint submenu", () => {
       -1,
     )?.[0] as Electron.MenuItemConstructorOptions[];
     expect(findMenuItem(template, undefined, "check-for-update")).toBeTruthy();
+  });
+
+  it("构建期未启用自动更新时隐藏更新入口", async () => {
+    const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");
+
+    envMock.autoUpdateEnabled = false;
+    envMock.value = "production";
+    rebuildApplicationMenu({
+      currentApplicationLocale: "en-US",
+      executeDesktopCommand: vi.fn(),
+    });
+    const template = buildFromTemplateMock.mock.calls.at(
+      -1,
+    )?.[0] as Electron.MenuItemConstructorOptions[];
+    expect(findMenuItem(template, undefined, "check-for-update")).toBeUndefined();
   });
 
   it("开发运行形态也隐藏已下线的压测开关", async () => {

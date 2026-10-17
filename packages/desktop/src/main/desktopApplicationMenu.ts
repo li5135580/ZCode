@@ -4,8 +4,8 @@ import {
   desktopMenuMessageIds,
   getDesktopMenuMessage,
   isValidShortcutBinding,
+  ZCODE_AUTO_UPDATE_ENABLED,
   ZCODE_ENV,
-  ZCODE_PRODUCT_FLAVOR,
   type DesktopCommandId,
   type Locale,
 } from "@zcode/shared";
@@ -118,8 +118,9 @@ function buildApplicationMenuTemplate(options: {
                 label: getLabel(desktopMenuMessageIds.helpAbout),
                 click: () => void options.executeDesktopCommand(DesktopCommandIds.ShowAbout),
               },
-              // 更新入口跟随产品身份：Preview 禁用更新器，生产后端的 Preview 也不例外。
-              ...(ZCODE_PRODUCT_FLAVOR === "production"
+              // 更新入口跟随构建期能力开关：只要构建时启用了自动更新就展示，
+              // Preview 身份（二开包）同样需要手动检查更新。
+              ...(ZCODE_AUTO_UPDATE_ENABLED
                 ? [
                     {
                       id: CHECK_FOR_UPDATE_MENU_ID,
@@ -260,7 +261,8 @@ function buildApplicationMenuTemplate(options: {
                 label: getLabel(desktopMenuMessageIds.helpAbout),
                 click: () => void options.executeDesktopCommand(DesktopCommandIds.ShowAbout),
               },
-              ...(ZCODE_PRODUCT_FLAVOR === "production"
+              // 与 macOS App 菜单一致：入口只跟随构建期自动更新能力开关。
+              ...(ZCODE_AUTO_UPDATE_ENABLED
                 ? [
                     {
                       id: CHECK_FOR_UPDATE_MENU_ID,

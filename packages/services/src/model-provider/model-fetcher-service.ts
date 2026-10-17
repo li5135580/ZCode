@@ -132,7 +132,11 @@ async function fetchOpenAICompatibleModels(
 
     const models: FetchedModelInfo[] = list
       .filter((item): item is { id: string } => isRecord(item) && typeof item.id === "string")
-      .map((item) => ({ modelId: item.id, source: "api" as const }));
+      .map((item) => ({
+        modelId: item.id,
+        ...parseModelMetadata(item),
+        source: "api" as const,
+      }));
 
     return { success: true, models };
   } catch (error) {
@@ -142,6 +146,68 @@ async function fetchOpenAICompatibleModels(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+/**
+ * 从 `/models` 单条记录里提取能力元数据。
+ *
+ * 不同 provider 的字段名不统一（[OI] 兼容端点多数只返回 `id`），因此这里只按
+ * 「字段存在且类型合法」取值，取不到就保持缺省，交由 Host 推荐规则表解析。
+ * 这样既能在 OpenRouter 这类返回完整元数据的端点上得到官方参数，又不会因为
+ * 字段名猜错而写入错误覆盖。
+ */
+function parseModelMetadata(item: Record<string, unknown>): Partial<FetchedModelInfo> {
+  const topProvider = isRecord(item.top_provider) ? item.top_provider : undefined;
+
+  const contextWindow = firstPositiveInteger(
+    item.context_length,
+    item.context_window,
+    item.max_context_length,
+    topProvider?.context_length,
+  );
+  const maxOutputTokens = firstPositiveInteger(
+    item.max_completion_tokens,
+    item.max_output_tokens,
+    topProvider?.max_completion_tokens,
+  );
+  const inputFormat = parseInputModalities(item.architecture);
+
+  return {
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+    ...(inputFormat !== undefined ? { inputFormat } : {}),
+  };
+}
+
+/** 取第一个「有限正整数」候选值；其余（字符串、负数、NaN）一律忽略。 */
+function firstPositiveInteger(...candidates: readonly unknown[]): number | undefined {
+  for (const candidate of candidates) {
+    if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate <= 0) {
+      continue;
+    }
+    return Math.trunc(candidate);
+  }
+  return undefined;
+}
+
+/** `architecture.input_modalities` → 输入能力；数组缺失或为空时返回 undefined。 */
+function parseInputModalities(architecture: unknown): FetchedModelInfo["inputFormat"] {
+  if (!isRecord(architecture)) return undefined;
+  const modalities = architecture.input_modalities;
+  if (!Array.isArray(modalities)) return undefined;
+  const normalized = modalities
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim().toLowerCase());
+  if (normalized.length === 0) return undefined;
+  // "file" 在 OpenRouter 语义里就是文档/PDF 附件。
+  const has = (...names: readonly string[]) => names.some((name) => normalized.includes(name));
+  return {
+    supportsText: has("text"),
+    supportsImage: has("image"),
+    supportsVideo: has("video"),
+    supportsAudio: has("audio"),
+    supportsPdf: has("file", "pdf"),
+  };
 }
 
 /**

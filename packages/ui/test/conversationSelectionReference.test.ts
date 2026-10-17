@@ -6,6 +6,7 @@ import {
   dispatchConversationSelectionAdd,
   getConversationSelectionReferenceScope,
   parsePromptConversationSelections,
+  toConversationQuote,
   type ConversationSelectionReference,
 } from "../src/lib/conversationSelectionReference.js";
 import {
@@ -60,6 +61,70 @@ describe("conversation selection references", () => {
     const otherRow = appendConversationSelectionReference(first.references, reference("ref-3", 2));
     expect(otherRow).toMatchObject({ ok: true, duplicate: false });
     if (otherRow.ok) expect(otherRow.references).toHaveLength(2);
+  });
+
+  it("同源同文二次添加只更新批注，不追加重复条目", () => {
+    const first = appendConversationSelectionReference([], reference("ref-1"));
+    expect(first).toMatchObject({ ok: true, duplicate: false });
+    if (!first.ok) return;
+
+    const annotated = appendConversationSelectionReference(first.references, {
+      ...reference("ref-2"),
+      comment: "  这里应该是 3 条  ",
+    });
+    expect(annotated).toMatchObject({ ok: true, duplicate: true });
+    if (!annotated.ok) return;
+    expect(annotated.references).toHaveLength(1);
+    // 保留原条目身份，只替换批注（并 trim）。
+    expect(annotated.references[0]).toMatchObject({ id: "ref-1", comment: "这里应该是 3 条" });
+
+    // 再次无批注添加不应清掉已有批注。
+    const plainAgain = appendConversationSelectionReference(annotated.references, reference("ref-3"));
+    expect(plainAgain).toMatchObject({ ok: true, duplicate: true });
+    if (plainAgain.ok) {
+      expect(plainAgain.references[0]).toMatchObject({ comment: "这里应该是 3 条" });
+    }
+  });
+
+  it("带批注的引用随 userselect 块往返，且批注超长原子拒绝", () => {
+    const annotated = { ...reference("ref-1"), comment: "改成两条" };
+    const prompt = buildPromptWithConversationSelections("Explain", [annotated]);
+    expect(prompt).toContain(JSON.stringify([{ text: "selected text", comment: "改成两条" }]));
+    expect(parsePromptConversationSelections(prompt)).toEqual({
+      visibleContent: "Explain",
+      references: [{ text: "selected text", comment: "改成两条" }],
+    });
+    expect(
+      buildPromptWithConversationSelections(
+        "Explain",
+        parsePromptConversationSelections(prompt).references,
+      ),
+    ).toBe(prompt);
+
+    const existing = [annotated];
+    const rejected = appendConversationSelectionReference(existing, {
+      ...reference("ref-2", 2),
+      comment: "x".repeat(2_001),
+    });
+    expect(rejected).toEqual({ ok: false, reason: "comment" });
+    expect(existing).toHaveLength(1);
+    expect(existing[0]?.comment).toBe("改成两条");
+  });
+
+  it("发送白名单包含批注但不泄露内部来源字段", () => {
+    const quote = toConversationQuote({
+      ...reference("ref-1"),
+      comment: "  补一句  ",
+      senderName: "Ryan Bot",
+      sentAt: "2026-09-09T10:32:44+08:00",
+    });
+    expect(quote).toEqual({
+      text: "selected text",
+      comment: "补一句",
+      senderName: "Ryan Bot",
+      sentAt: "2026-09-09T10:32:44+08:00",
+    });
+    expect(Object.keys(quote).sort()).toEqual(["comment", "senderName", "sentAt", "text"]);
   });
 
   it("超限原子拒绝，不截断或修改已有引用", () => {

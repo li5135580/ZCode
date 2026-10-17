@@ -75,7 +75,7 @@ describe("Markdown preview selections", () => {
       }),
     ).toMatchObject({ duplicate: false });
     expect(buildPromptWithConversationSelections("Explain", [reference])).toContain(
-      JSON.stringify([{ path: "/workspace/a.md", text: reference.text }]),
+      JSON.stringify([{ text: reference.text, path: "/workspace/a.md" }]),
     );
     expect(buildPromptWithConversationSelections("Explain", [reference])).not.toContain(
       "sourceKey",

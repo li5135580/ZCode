@@ -5,7 +5,7 @@ import {
   requestSelectionSideChatOpen,
   subscribeSelectionSideChatRuntime,
 } from "@/lib/selectionSideChatRuntime.js";
-import { useCallback, useSyncExternalStore, type RefObject } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { useTextSelection } from "@/hooks/useTextSelection.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { hasExcludedConversationSelectionEndpoint } from "@/lib/conversationSelectionGuard.js";
@@ -67,21 +67,40 @@ export function MarkdownSelectionTooltip({
     () => (sideKey ? getSelectionSideChatOpenState(sideKey) : "unavailable"),
     () => "unavailable",
   );
-  if (!state) return null;
-  const createReference = () =>
+  // 批注输入框聚焦会让文档选区折叠，选区监听随即关闭菜单；展开期间冻结当前快照。
+  const [frozen, setFrozen] = useState(false);
+  const frozenStateRef = useRef<typeof state>(null);
+  if (state) frozenStateRef.current = state;
+  const handleAnnotationOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      setFrozen(true);
+      return;
+    }
+    setFrozen(false);
+    frozenStateRef.current = null;
+  }, []);
+  const visibleState = frozen ? frozenStateRef.current : state;
+  const finish = useCallback(() => {
+    setFrozen(false);
+    frozenStateRef.current = null;
+    close();
+  }, [close]);
+  if (!visibleState) return null;
+  const createReference = (comment?: string) =>
     createConversationSelectionReference({
       contentType: "markdown",
       sourceKey,
       sourceTitle,
       path: sourcePath,
-      text: state.text,
+      text: visibleState.text,
+      ...(comment ? { comment } : {}),
     });
   return (
     <SelectionActionMenu
-      center={state.center}
-      top={state.top}
-      bottom={state.bottom}
-      singleLimit={state.text.length > CONVERSATION_SELECTION_MAX_TEXT_LENGTH}
+      center={visibleState.center}
+      top={visibleState.top}
+      bottom={visibleState.bottom}
+      singleLimit={visibleState.text.length > CONVERSATION_SELECTION_MAX_TEXT_LENGTH}
       sideActionDisabled={sideState !== "ready"}
       sideDisabledTitle={
         sideState === "ready"
@@ -93,17 +112,18 @@ export function MarkdownSelectionTooltip({
                   : "chat.selections.previewSideUnavailable",
             })
       }
-      onAddToCurrentTask={() => {
+      onAddToCurrentTask={(comment) => {
         dispatchConversationSelectionAdd({
           targetSessionId: target.sessionId,
           workspaceKey: target.workspaceKey,
-          reference: createReference(),
+          reference: createReference(comment),
         });
-        close();
+        finish();
       }}
       onAskInSideChat={() => {
-        if (sideKey && requestSelectionSideChatOpen(sideKey, createReference())) close();
+        if (sideKey && requestSelectionSideChatOpen(sideKey, createReference())) finish();
       }}
+      onAnnotationOpenChange={handleAnnotationOpenChange}
     />
   );
 }

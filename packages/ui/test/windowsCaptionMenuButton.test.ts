@@ -166,12 +166,12 @@ describe("WindowsCaptionMenuButton", () => {
     expect(html).not.toContain("titleBar.menu.help.toggleBulkSessionStressTest");
   });
 
-  it("Preview 隐藏更新入口，生产版继续保留", async () => {
+  it("更新入口跟随构建期自动更新能力，而不是产品身份", async () => {
     const { shouldShowDesktopUpdateEntry } = await import("@/WindowsCaptionMenuButton.js");
 
-    // 更新入口跟随产品身份：生产后端的 Preview 同样隐藏。
-    expect(shouldShowDesktopUpdateEntry("preview")).toBe(false);
-    expect(shouldShowDesktopUpdateEntry("production")).toBe(true);
+    // Preview 身份的二开包同样需要手动检查更新；只有构建期关闭自动更新时才隐藏。
+    expect(shouldShowDesktopUpdateEntry(true)).toBe(true);
+    expect(shouldShowDesktopUpdateEntry(false)).toBe(false);
 
     const html = await renderButton("header");
     expect(html).not.toContain("titleBar.menu.help.checkForUpdates");

@@ -250,3 +250,93 @@ describe("fetchProviderModels [OI] 兼容接口", () => {
     expect(result.error).toContain("data");
   });
 });
+
+describe("fetchProviderModels 解析 /models 能力元数据", () => {
+  function mockModelsResponse(data: unknown) {
+    return vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }
+
+  it("解析 OpenRouter 风格元数据：上下文、输出上限与输入模态", async () => {
+    mockModelsResponse([
+      {
+        id: "vendor/some-model",
+        context_length: 1_000_000,
+        top_provider: { context_length: 999, max_completion_tokens: 64_000 },
+        architecture: { input_modalities: ["text", "image", "file"] },
+      },
+    ]);
+
+    const result = await fetchProviderModels(
+      { apiKind: "openai-chat-completions", baseUrl: "https://openrouter.ai/api/v1" },
+      "k",
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.models[0]).toMatchObject({
+      modelId: "vendor/some-model",
+      contextWindow: 1_000_000,
+      maxOutputTokens: 64_000,
+      inputFormat: {
+        supportsText: true,
+        supportsImage: true,
+        supportsVideo: false,
+        supportsAudio: false,
+        supportsPdf: true,
+      },
+    });
+  });
+
+  it("顶层字段优先于 top_provider 回退值", async () => {
+    mockModelsResponse([
+      {
+        id: "m",
+        context_length: 200_000,
+        top_provider: { context_length: 8_000 },
+      },
+    ]);
+
+    const result = await fetchProviderModels(
+      { apiKind: "openai-responses", baseUrl: "https://example.test/v1" },
+      "k",
+    );
+
+    expect(result.models[0].contextWindow).toBe(200_000);
+  });
+
+  it("元数据类型非法时忽略该字段，不写入错误覆盖", async () => {
+    mockModelsResponse([
+      {
+        id: "m",
+        context_length: "1000000",
+        max_completion_tokens: -5,
+        architecture: { input_modalities: "text" },
+      },
+    ]);
+
+    const result = await fetchProviderModels(
+      { apiKind: "openai-chat-completions", baseUrl: "https://example.test/v1" },
+      "k",
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.models[0].contextWindow).toBeUndefined();
+    expect(result.models[0].maxOutputTokens).toBeUndefined();
+    expect(result.models[0].inputFormat).toBeUndefined();
+  });
+
+  it("只有 id 的端点（如 Z.AI）行为保持不变", async () => {
+    mockModelsResponse([{ id: "glm-5" }]);
+
+    const result = await fetchProviderModels(
+      { apiKind: "openai-chat-completions", baseUrl: "https://api.z.ai/api/paas/v4" },
+      "k",
+    );
+
+    expect(result.models[0]).toEqual({ modelId: "glm-5", source: "api" });
+  });
+});

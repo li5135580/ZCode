@@ -1,6 +1,6 @@
 import { SelectionActionMenu } from "@/v4/SelectionActionMenu.js";
 import { useTextSelection } from "@/hooks/useTextSelection.js";
-import { useCallback, useRef, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 import type { ConversationRow } from "@zcode/shared/zcode-protocol-v4";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import {
@@ -50,7 +50,7 @@ export function ConversationSelectionTooltip({
   sourceSessionId: string;
   enabled: boolean;
   sideActionDisabled?: boolean;
-  onAddToCurrentTask: (reference: ConversationSelectionReference) => void;
+  onAddToCurrentTask: (reference: ConversationSelectionReference, comment?: string) => void;
   onAskInSideChat: (reference: ConversationSelectionReference) => void;
 }) {
   const { intl } = useZCodeIntl();
@@ -121,24 +121,50 @@ export function ConversationSelectionTooltip({
     inspect: inspectSelection,
     scopeKey: sourceSessionId,
   });
+  // 批注输入框获取焦点会让文档选区折叠，选区监听随即关闭菜单。
+  // 展开批注时冻结当前快照，确认/取消后再释放。
+  const [frozen, setFrozen] = useState(false);
+  const frozenStateRef = useRef<TooltipState | null>(null);
+  if (state) frozenStateRef.current = state;
+  const handleAnnotationOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      setFrozen(true);
+      return;
+    }
+    setFrozen(false);
+    frozenStateRef.current = null;
+  }, []);
+  const visibleState = frozen ? frozenStateRef.current : state;
+  const finish = useCallback(() => {
+    setFrozen(false);
+    frozenStateRef.current = null;
+    close();
+  }, [close]);
 
-  if (!state) return null;
+  if (!visibleState) return null;
   return (
     <SelectionActionMenu
-      center={state.center}
-      top={state.top}
-      bottom={state.bottom}
-      singleLimit={Boolean(state.error)}
+      center={visibleState.center}
+      top={visibleState.top}
+      bottom={visibleState.bottom}
+      singleLimit={Boolean(visibleState.error)}
       sideActionDisabled={sideActionDisabled}
       sideDisabledTitle={intl.formatMessage({ id: "chat.selections.sideBlocked" })}
-      onAddToCurrentTask={() => {
-        if (state.reference) onAddToCurrentTask(state.reference);
-        close();
+      onAddToCurrentTask={(comment) => {
+        if (visibleState.reference) {
+          // 批注同时并入 reference：宿主只接收 reference 也能完整落库，无需改调用方。
+          onAddToCurrentTask(
+            comment ? { ...visibleState.reference, comment } : visibleState.reference,
+            comment,
+          );
+        }
+        finish();
       }}
       onAskInSideChat={() => {
-        if (state.reference) onAskInSideChat(state.reference);
-        close();
+        if (visibleState.reference) onAskInSideChat(visibleState.reference);
+        finish();
       }}
+      onAnnotationOpenChange={handleAnnotationOpenChange}
     />
   );
 }

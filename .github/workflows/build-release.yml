@@ -51,6 +51,30 @@ jobs:
           pnpm --version
           pnpm config get registry
 
+      - name: Resolve fork app version
+        shell: bash
+        # 构建期注入 fork 版本：根 package.json 必须与上游对齐（如 3.15.1），
+        # 但 `3.15.1-fork.N` 在 semver 里小于 3.15.1，electron-updater 不会认为有更新。
+        # 因此 tag `v3.15.1-fork.2` 推导为 `3.15.2-fork.2`（patch + 1，保留 fork 序号）。
+        # 推导逻辑在 scripts/ci/fork-release-version.mjs（有单测），这里只负责写 GITHUB_ENV。
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME}"
+            version="$(node scripts/ci/fork-release-version.mjs --tag "$tag")"
+            # Windows runner 的 PowerShell 不传递原生命令退出码，因此显式校验结果非空。
+            if [ -z "$version" ]; then
+              echo "::error title=fork version empty::无法从 tag ${tag} 推导 fork 版本"
+              exit 1
+            fi
+            echo "ZCODE_APP_VERSION=$version" >> "$GITHUB_ENV"
+            echo "fork app version: $version (from tag $tag)"
+          else
+            # 非 tag 触发（push main / workflow_dispatch）不发布 Release，
+            # 沿用 package.json 版本，避免 run number 版本号跑在正式 fork tag 前面。
+            echo "not a tag build; keep package.json version"
+          fi
+
       - name: Build installer
         shell: bash
         run: |
@@ -81,6 +105,23 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           ZCODE_ENV: "production"
           ZCODE_PREVIEW_IDENTITY: "1"
+          # 构建期开启自动更新能力（对应 __ZCODE_AUTO_UPDATE_ENABLED__）。
+          # 未设置时主进程不会 setFeedURL、不会注册 update-* 事件，手动检查只会返回 dev-skipped。
+          ZCODE_AUTO_UPDATE: "1"
+
+      - name: Normalize latest.yml asset urls
+        shell: bash
+        if: matrix.target == 'win'
+        # electron-builder 把磁盘上的真实文件名写进 latest.yml，而 artifactName 含 ${productName}
+        # （`ZCode Preview`，带空格）。GitHub Release 上传时会把空格替换成点号，
+        # 若 latest.yml 仍写带空格的 url，客户端拼出的 releases/latest/download/<url> 会 404。
+        # 这里统一改写成 GitHub 资产名，并校验对应文件确实存在。
+        run: |
+          set -euo pipefail
+          node scripts/ci/normalize-latest-yml.mjs --dir packages/desktop/dist
+          echo "=== latest.yml ==="
+          cat packages/desktop/dist/latest.yml
+          test -s packages/desktop/dist/latest.yml || { echo "::error::latest.yml 缺失或为空"; exit 1; }
 
       - name: Verify renderer build output
         shell: bash
@@ -112,6 +153,10 @@ jobs:
             packages/desktop/dist/*.rpm
             packages/desktop/dist/*.AppImage
             packages/desktop/dist/*.pkg.tar.zst
+            # electron-updater 的更新元数据：latest.yml 里 files[].url 指向同目录安装包，
+            # 必须和安装包一起上传到 Release，客户端才能发现更新。
+            packages/desktop/dist/*.yml
+            packages/desktop/dist/*.blockmap
           retention-days: 7
 
   release:
@@ -138,4 +183,8 @@ jobs:
             artifacts/**/*.rpm
             artifacts/**/*.AppImage
             artifacts/**/*.pkg.tar.zst
+            # 更新元数据与差分块文件：latest.yml 由 electron-builder 的 generic publish
+            # 配置生成，客户端默认从 releases/latest/download/latest.yml 读取。
+            artifacts/**/*.yml
+            artifacts/**/*.blockmap
           generate_release_notes: true

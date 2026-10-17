@@ -163,6 +163,7 @@ import { PptxElementReferenceChip } from "@/v4/composer/PptxElementReferenceChip
 import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementReference.js";
 import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { useConversationSelectionReferences } from "@/v4/composer/useConversationSelectionReferences.js";
+import { toConversationQuote } from "@/lib/conversationSelectionReference.js";
 import { ConversationBackgroundWorkTrigger } from "@/v4/composer/ConversationBackgroundWorkTrigger.js";
 import { V4ComposerCuaEntry } from "@/v4/composer/V4ComposerCuaEntry.js";
 import {
@@ -823,6 +824,7 @@ function ConversationComposerImpl({
     limitReason: conversationSelectionLimitReason,
     removeReference: removeConversationSelectionReference,
     clearReferences: clearConversationSelectionReferences,
+    updateReferenceComment: updateConversationSelectionReferenceComment,
   } = useConversationSelectionReferences({ sessionId, workspaceKey });
   const hasConversationSelectionReferences = conversationSelectionReferences.length > 0;
 
@@ -1437,16 +1439,7 @@ function ConversationComposerImpl({
           submission,
           ...(currentConversationSelections.length
             ? {
-                conversationQuotes: currentConversationSelections.map(
-                  ({ text, path, senderName, senderId, messageId, sentAt }) => ({
-                    text,
-                    path,
-                    senderName,
-                    senderId,
-                    messageId,
-                    sentAt,
-                  }),
-                ),
+                conversationQuotes: currentConversationSelections.map(toConversationQuote),
               }
             : {}),
           telemetrySeed,
@@ -2105,6 +2098,7 @@ function ConversationComposerImpl({
               references={conversationSelectionReferences}
               onRemove={removeConversationSelectionReference}
               onRemoveAll={clearConversationSelectionReferences}
+              onEditComment={updateConversationSelectionReferenceComment}
             />
           </div>
         ) : null}
@@ -2126,6 +2120,7 @@ function ConversationComposerImpl({
     locale,
     removeCodeCommentContext,
     removeConversationSelectionReference,
+    updateConversationSelectionReferenceComment,
     removeWebElementContext,
     removePluginUiContext,
     removePptxElementReference,

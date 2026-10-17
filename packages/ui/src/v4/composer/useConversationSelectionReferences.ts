@@ -6,6 +6,7 @@ import {
   getConversationSelectionAddEventName,
   isConversationSelectionAddEvent,
   setConversationSelectionReferenceScope,
+  updateConversationSelectionReferenceComment,
   type ConversationSelectionLimitReason,
   type ConversationSelectionReference,
 } from "@/lib/conversationSelectionReference.js";
@@ -78,6 +79,23 @@ export function useConversationSelectionReferences(options: {
     setReferences([]);
     setLimitReason(null);
   }, [setReferences]);
+  const updateReferenceComment = useCallback(
+    (id: string, comment: string | undefined) => {
+      const result = updateConversationSelectionReferenceComment(
+        options.sessionId,
+        options.workspaceKey,
+        id,
+        comment,
+      );
+      if (!result.ok) {
+        setLimitReason(result.reason);
+        return;
+      }
+      setReferencesState(result.references);
+      setLimitReason(null);
+    },
+    [options.sessionId, options.workspaceKey],
+  );
   const dismissLimitReason = useCallback(() => {
     clearConversationSelectionReferenceLimitReason(options.sessionId, options.workspaceKey);
     setLimitReason(null);
@@ -89,5 +107,6 @@ export function useConversationSelectionReferences(options: {
     dismissLimitReason,
     removeReference,
     clearReferences,
+    updateReferenceComment,
   };
 }

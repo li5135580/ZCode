@@ -29,6 +29,21 @@ it.each(["/workspace/docs/a.md", "C:\\docs\\a.md"])(
     expect(await screen.findByText("excerpt")).toBeTruthy();
   },
 );
+it("chip 展示每条引用的批注文案", async () => {
+  render(
+    createElement(
+      ZCodeIntlProvider,
+      { initialLocale: "zh-CN" },
+      createElement(ConversationSelectionReferenceChip, {
+        references: [{ text: "原文摘录", comment: "这里应该是三条" }],
+      }),
+    ),
+  );
+  const chip = screen.getByRole("button", { name: "1 条对话引用" });
+  fireEvent.pointerEnter(chip);
+  expect(await screen.findByText("这里应该是三条")).toBeTruthy();
+  expect(await screen.findByText("批注")).toBeTruthy();
+});
 it("混合引用使用通用计数", () => {
   render(
     createElement(

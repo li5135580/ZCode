@@ -966,14 +966,15 @@ function SubagentForm({
     !isSubagentThoughtLevelAvailable(thoughtLevelState, thoughtLevel),
   );
   const trimmedName = name.trim();
-  // 模型链草稿：启用时按需初始化（主模型沿用当前单模型选择），关闭时保持原值以便再次打开。
+  // 模型链草稿：主模型始终取上方「模型」字段（编辑器不再渲染主模型槽位），
+  // 编辑器只维护备用模型与重试次数；关闭时保留草稿以便再次打开。
   const modelChainDraft = useMemo<SubagentModelChainEditorValue>(() => {
+    const primary = toSubagentModelSelection(persistedModel, thoughtLevel);
     if (modelChain) {
-      return modelChain;
+      return { ...modelChain, primary };
     }
-    const selection = toSubagentModelSelection(persistedModel, thoughtLevel);
     return {
-      primary: selection,
+      primary,
       fallbacks: [],
       retryCount: DEFAULT_SUBAGENT_MODEL_CHAIN_RETRY_COUNT,
     };
