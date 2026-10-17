@@ -94,6 +94,30 @@ describe("external relay QR helpers", () => {
     );
   });
 
+  it("二维码 URL 只携带 stable 版本，prerelease 后缀会被服务端入口拒绝", () => {
+    // 远程控制入口对 app_version 做版本白名单校验：带 prerelease（如 3.15.2-fork.3）
+    // 会被网关直接返回 404「Not Found.」，页面根本加载不出来。
+    // 因此二维码里只上报 base 版本，让入口按 stable 版本处理。
+    const buildUrl = (appVersion: string) =>
+      buildWebRemoteControlExternalQrUrl({
+        baseUrl: "https://zcode.z.ai/remote/v4",
+        deviceSid: "sid-1",
+        passHash: "hash",
+        timestamp: 1710000000000,
+        appVersion,
+      });
+
+    expect(new URL(buildUrl("3.15.2-fork.3")).searchParams.get("app_version")).toBe("3.15.2");
+    expect(new URL(buildUrl("3.15.1-fork.2")).searchParams.get("app_version")).toBe("3.15.1");
+    expect(new URL(buildUrl("3.15.2-beta.1")).searchParams.get("app_version")).toBe("3.15.2");
+    expect(new URL(buildUrl("3.15.2+build.7")).searchParams.get("app_version")).toBe("3.15.2");
+    expect(new URL(buildUrl("v3.15.3")).searchParams.get("app_version")).toBe("3.15.3");
+    // stable 版本原样保留。
+    expect(new URL(buildUrl("3.15.2")).searchParams.get("app_version")).toBe("3.15.2");
+    // 不是合法 semver 时干脆不传，避免把无意义的值写进入口参数。
+    expect(new URL(buildUrl("dev")).searchParams.has("app_version")).toBe(false);
+  });
+
   it("parses required external relay QR params", () => {
     expect(
       parseWebRemoteControlExternalQrParams(

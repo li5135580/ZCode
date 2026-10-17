@@ -235,6 +235,22 @@ function readNonEmptySearchParam(params: URLSearchParams, name: string): string 
   return value ? value : undefined;
 }
 
+/**
+ * 把客户端版本折算成远程控制入口可接受的 `app_version`。
+ *
+ * 远程控制入口（`/remote/vN`）对 `app_version` 做版本校验：携带 semver prerelease
+ * 或 build 元数据的值（例如二开构建的 `3.15.2-fork.3`）会被网关直接返回
+ * 404「Not Found.」，页面完全加载不出来。因此这里只上报 `major.minor.patch`，
+ * 与官方正式版的取值形态一致；无法解析出三段版本时不传该参数。
+ */
+export function resolveWebRemoteControlEntryAppVersion(
+  appVersion: string | undefined,
+): string | undefined {
+  const trimmed = appVersion?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i)?.slice(1, 4).join(".");
+}
+
 export function isWebRemoteControlThemeSeed(value: unknown): value is WebRemoteControlThemeSeed {
   return (
     value === "light" ||
@@ -290,8 +306,9 @@ export function buildWebRemoteControlExternalQrUrl({
   if (deviceName?.trim()) {
     url.searchParams.set("name", deviceName);
   }
-  if (appVersion?.trim()) {
-    url.searchParams.set("app_version", appVersion);
+  const entryAppVersion = resolveWebRemoteControlEntryAppVersion(appVersion);
+  if (entryAppVersion) {
+    url.searchParams.set("app_version", entryAppVersion);
   }
   void theme;
   // Bugfix: 手机端主题现在固定走本地默认 dark，不再通过二维码 URL 透传 theme。
