@@ -63,8 +63,9 @@ modelChain:
 
 ### 3. Multi-Spot Annotations
 
-- **Per-quote notes**: Select part of an assistant reply and choose "Add with note" to describe
-  what should change there
+- **Extends the original button**: Select part of an assistant reply and click "Add to chat";
+  the menu expands a note field. "Skip and add" is the original one-click behavior without a note
+- **Per-quote notes**: Write what should change at that spot
 - **Annotate several spots**: Mark multiple deviations in one turn, then send them together as
   a single message
 - **Edit before sending**: Each note can be edited or removed in the composer's quote list
