@@ -2,6 +2,53 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
+## [二开 fork.6] - 2026-10-18
+
+> 构建标签 `v3.15.1-fork.6`，安装包版本 `3.15.2-fork.6`。
+
+### 新增：macOS 与 Linux 客户端
+
+此前 CI 矩阵只构建 Windows（`6553cc88` 曾显式注释掉另外两个平台）。本版补回：
+
+| 平台 | 产物 |
+| --- | --- |
+| Windows x64 | `ZCode.Preview-<版本>-win-x64.exe` |
+| macOS arm64 | `.dmg` + `.zip` |
+| Linux x64 | `.AppImage` + `.deb` |
+
+macOS 只出 arm64：Intel Mac 已停止出货，单独维护 x64 产物的收益低于构建成本。
+Linux 只出 AppImage 与 deb：rpm 需要构建机预装 `rpmbuild` 与 `xz`，pacman 也需要额外
+工具，对分发验证场景是不必要的构建面。Linux 打包目标可通过 `ZCODE_LINUX_TARGETS`
+收窄，默认仍保持全量格式。
+
+### 修复：更新清单按平台选择
+
+更新源此前硬编码 Windows 的 `latest.yml`，macOS/Linux 客户端会读到 Windows 清单并
+下载到错误的安装包。现在按运行平台推导：
+
+- Windows → `latest.yml`
+- macOS → `latest-mac.yml`
+- Linux → `latest-linux.yml`（arm64 为 `latest-linux-arm64.yml`）
+
+`scripts/ci/normalize-latest-yml.mjs` 增加 `--file` 参数，CI 按矩阵选择要归一化的清单；
+Linux 任务额外校验清单指向 `.AppImage`，因为 electron-updater 在 Linux 上只认 AppImage
+作为更新产物，deb 仅用于首次安装。
+
+### 修复：macOS arm64 未签名产物无法启动
+
+`mac.identity` 在未启用正式签名时被置为 `null`，而 electron-builder 遇到 `identity: null`
+会在 ad-hoc 回退之前直接跳过签名阶段。Apple Silicon 拒绝加载无签名的 Mach-O，
+产出的 `.app` 会被系统直接终止。现在 arm64 在未签名构建下显式使用 ad-hoc 身份 `-`，
+x64 仍跳过签名（Intel 无此硬性约束）。
+
+### 修复：构建健壮性
+
+- `resources/macos-window-bounds/zcode-window-bounds` 缺失时（构建机无 `swiftc`）
+  跳过 extraResources 拷贝，避免 electron-builder 因源文件不存在而失败。
+- `node-pty` 在非 Windows 平台的 `electron-rebuild` 失败时，若存在可用预编译产物
+  （macOS 自带 `prebuilds/darwin-*`，Linux 来自 `@lydell/node-pty-linux-*`）则降级继续，
+  避免 CI runner 缺编译链时 `pnpm install` 整体中断。
+
 ## [二开 fork.5] - 2026-10-17
 
 > 构建标签 `v3.15.1-fork.5`，安装包版本 `3.15.2-fork.5`。
