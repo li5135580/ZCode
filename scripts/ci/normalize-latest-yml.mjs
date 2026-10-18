@@ -109,9 +109,12 @@ const currentFilePath = fileURLToPath(import.meta.url);
 if (entryFilePath === currentFilePath) {
   try {
     const distDir = resolve(readArg(process.argv.slice(2), "--dir") || "packages/desktop/dist");
-    const ymlPath = join(distDir, "latest.yml");
+    // 清单文件名随平台变化：Windows latest.yml、macOS latest-mac.yml、
+    // Linux latest-linux.yml（arm64 带 -arm64 后缀）。默认仍取 latest.yml 以兼容既有调用。
+    const manifestName = readArg(process.argv.slice(2), "--file") || "latest.yml";
+    const ymlPath = join(distDir, manifestName);
     if (!existsSync(ymlPath)) {
-      throw new Error(`latest.yml 未生成: ${ymlPath}`);
+      throw new Error(`${manifestName} 未生成: ${ymlPath}`);
     }
 
     const original = readFileSync(ymlPath, "utf8");
@@ -120,7 +123,7 @@ if (entryFilePath === currentFilePath) {
 
     const missing = verifyLatestYmlArtifacts(distDir, content);
     if (missing.length > 0) {
-      throw new Error(`latest.yml 指向的产物不存在: ${missing.join(", ")}`);
+      throw new Error(`${manifestName} 指向的产物不存在: ${missing.join(", ")}`);
     }
 
     for (const item of renamed) {
@@ -129,7 +132,16 @@ if (entryFilePath === currentFilePath) {
     process.stdout.write(`[latest-yml] normalized ${ymlPath}\n`);
     process.stdout.write(
       `[latest-yml] dist assets: ${readdirSync(distDir)
-        .filter((name) => name.endsWith(".exe") || name.endsWith(".blockmap") || name.endsWith(".yml"))
+        .filter(
+          (name) =>
+            name.endsWith(".exe") ||
+            name.endsWith(".dmg") ||
+            name.endsWith(".zip") ||
+            name.endsWith(".AppImage") ||
+            name.endsWith(".deb") ||
+            name.endsWith(".blockmap") ||
+            name.endsWith(".yml"),
+        )
         .join(", ")}\n`,
     );
   } catch (error) {

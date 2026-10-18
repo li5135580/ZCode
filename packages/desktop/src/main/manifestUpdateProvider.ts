@@ -1,10 +1,10 @@
 import { posix } from "node:path";
 import type { CustomPublishOptions, PackageFileInfo } from "builder-util-runtime";
 import {
-  DEFAULT_UPDATE_FEED_URL,
   DEFAULT_ZCODE_ENDPOINT_ORIGIN,
   UPDATE_FEED_URL_ENV,
   normalizeZCodeEndpointOrigin,
+  resolveDefaultUpdateFeedUrl,
   type ElectronReleaseChannel,
 } from "@zcode/shared";
 import {
@@ -21,11 +21,13 @@ import {
 import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Provider.js";
 import { parse as parseYaml } from "yaml";
 
-// 二开仓库的默认更新源：GitHub Releases 上的 electron-builder latest.yml。
+// 二开仓库的默认更新源：GitHub Releases 上的 electron-builder 更新清单。
 // 优先级：autoUpdater 解析的命令行 `--zcode-update-feed-url` > 环境变量
-// `ZCODE_UPDATE_FEED_URL` > 该默认值。命令行/环境变量来源会在 getLatestVersion
+// `ZCODE_UPDATE_FEED_URL` > 按平台推导的默认值。命令行/环境变量来源会在 getLatestVersion
 // 构建 manifest URL 前经 options.manifestUrl 透传，这里只兜底默认值。
-const GITHUB_RELEASES_MANIFEST_URL = DEFAULT_UPDATE_FEED_URL;
+// 清单文件名随平台不同（latest.yml / latest-mac.yml / latest-linux.yml），
+// 不能所有平台都读 Windows 的 latest.yml。
+const GITHUB_RELEASES_MANIFEST_URL = resolveDefaultUpdateFeedUrl();
 
 export const ELECTRON_MANIFEST_API_PATH =
   process.env[UPDATE_FEED_URL_ENV]?.trim() || GITHUB_RELEASES_MANIFEST_URL;

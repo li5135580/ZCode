@@ -72,4 +72,52 @@ describe("latest.yml 资产名归一化", () => {
       "ZCode.Preview-3.15.2-fork.2-win-x64.exe",
     ]);
   });
+
+  // latest-mac.yml / latest-linux.yml 与 Windows 清单结构相同，只是 files 里可能有
+  // 多个产物（mac 是 dmg+zip，linux 是 AppImage）。归一化必须逐个改写，不能只改第一个。
+  it("多产物的 macOS 清单逐个改写并全部校验", () => {
+    const dir = mkdtempSync(join(tmpdir(), "zcode-latest-mac-"));
+    tempDirs.push(dir);
+    const manifest = `version: 3.15.2-fork.6
+files:
+  - url: ZCode Preview-3.15.2-fork.6-mac-arm64.zip
+    sha512: maczip
+    size: 200
+  - url: ZCode Preview-3.15.2-fork.6-mac-arm64.dmg
+    sha512: macdmg
+    size: 300
+path: ZCode Preview-3.15.2-fork.6-mac-arm64.zip
+sha512: maczip
+releaseDate: '2026-10-18T00:00:00.000Z'
+`;
+    writeFileSync(join(dir, "ZCode Preview-3.15.2-fork.6-mac-arm64.zip"), "x");
+    writeFileSync(join(dir, "ZCode Preview-3.15.2-fork.6-mac-arm64.dmg"), "x");
+
+    const { content, renamed } = rewriteLatestYml(manifest);
+    const parsed = parse(content);
+
+    expect(parsed.files.map((file: { url: string }) => file.url)).toEqual([
+      "ZCode.Preview-3.15.2-fork.6-mac-arm64.zip",
+      "ZCode.Preview-3.15.2-fork.6-mac-arm64.dmg",
+    ]);
+    expect(parsed.path).toBe("ZCode.Preview-3.15.2-fork.6-mac-arm64.zip");
+    expect(renamed).toHaveLength(2);
+    expect(verifyLatestYmlArtifacts(dir, content)).toEqual([]);
+  });
+
+  it("Linux 清单里的 AppImage 同样按资产名规则改写", () => {
+    const manifest = `version: 3.15.2-fork.6
+files:
+  - url: ZCode Preview-3.15.2-fork.6-linux-x64.AppImage
+    sha512: appimg
+    size: 400
+path: ZCode Preview-3.15.2-fork.6-linux-x64.AppImage
+sha512: appimg
+releaseDate: '2026-10-18T00:00:00.000Z'
+`;
+    const parsed = parse(rewriteLatestYml(manifest).content);
+
+    expect(parsed.files[0].url).toBe("ZCode.Preview-3.15.2-fork.6-linux-x64.AppImage");
+    expect(parsed.path).toBe("ZCode.Preview-3.15.2-fork.6-linux-x64.AppImage");
+  });
 });

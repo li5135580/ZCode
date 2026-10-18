@@ -26,6 +26,7 @@ import {
   resolveZaiBusinessBaseUrl,
   resolveZaiOAuthClientId,
   resolveZaiOAuthOrigin,
+  resolveDefaultUpdateFeedUrl,
   resolveZCodeEndpointOrigin,
 } from "../src/zcodeEndpoint.js";
 import { appSettingsPatchSchema, appSettingsSchema } from "../src/validationAppSettings.js";
@@ -296,6 +297,17 @@ describe("zcodeEndpoint", () => {
       zaiOAuthClientId: TEST_ZAI_OAUTH_CLIENT_ID,
       bigModelApiOrigin: TEST_BIGMODEL_API_ORIGIN,
     });
+  });
+
+  it("按平台选择对应的 electron-builder 更新清单", () => {
+    // electron-builder 的清单文件名随平台不同：Windows latest.yml、
+    // macOS latest-mac.yml、Linux latest-linux.yml（arm64 带 -arm64 后缀）。
+    // 用 Windows 的清单驱动 macOS/Linux 的 updater 会下载到错误的安装包。
+    expect(resolveDefaultUpdateFeedUrl("win32", "x64")).toMatch(/\/latest\.yml$/);
+    expect(resolveDefaultUpdateFeedUrl("darwin", "arm64")).toMatch(/\/latest-mac\.yml$/);
+    expect(resolveDefaultUpdateFeedUrl("darwin", "x64")).toMatch(/\/latest-mac\.yml$/);
+    expect(resolveDefaultUpdateFeedUrl("linux", "x64")).toMatch(/\/latest-linux\.yml$/);
+    expect(resolveDefaultUpdateFeedUrl("linux", "arm64")).toMatch(/\/latest-linux-arm64\.yml$/);
   });
 
   it("rejects non-http endpoint origins", () => {

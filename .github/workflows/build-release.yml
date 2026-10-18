@@ -17,6 +17,16 @@ jobs:
         include:
           - os: windows-latest
             target: win
+            arch: x64
+          # macOS 只出 arm64：Intel Mac 已停止出货，单独维护 x64 产物的收益低于构建成本。
+          # 未签名构建依赖 electron-builder 的 ad-hoc 签名（arm64 强制要求），
+          # 用户首次打开需要右键「打开」或清除 quarantine 属性。
+          - os: macos-latest
+            target: mac
+            arch: arm64
+          - os: ubuntu-latest
+            target: linux
+            arch: x64
 
     runs-on: ${{ matrix.os }}
 
@@ -90,7 +100,7 @@ jobs:
           fi
 
           echo "=== [2/2] electron-builder bundle ==="
-          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch x64
+          pnpm --filter @zcode/desktop run bundle -- --os ${{ matrix.target }} --arch ${{ matrix.arch }}
           RC_BUNDLE=$?
           echo "=== bundle exit code: $RC_BUNDLE ==="
           if [ "$RC_BUNDLE" -ne 0 ]; then
@@ -108,20 +118,39 @@ jobs:
           # 构建期开启自动更新能力（对应 __ZCODE_AUTO_UPDATE_ENABLED__）。
           # 未设置时主进程不会 setFeedURL、不会注册 update-* 事件，手动检查只会返回 dev-skipped。
           ZCODE_AUTO_UPDATE: "1"
+          # Linux 只出 AppImage + deb：rpm 需要 runner 预装 rpmbuild 与 xz，
+          # pacman 也需要额外工具，对分发验证场景是不必要的构建面。
+          ZCODE_LINUX_TARGETS: "AppImage,deb"
 
-      - name: Normalize latest.yml asset urls
+      - name: Normalize update manifest asset urls
         shell: bash
-        if: matrix.target == 'win'
-        # electron-builder 把磁盘上的真实文件名写进 latest.yml，而 artifactName 含 ${productName}
+        # electron-builder 把磁盘上的真实文件名写进更新清单，而 artifactName 含 ${productName}
         # （`ZCode Preview`，带空格）。GitHub Release 上传时会把空格替换成点号，
-        # 若 latest.yml 仍写带空格的 url，客户端拼出的 releases/latest/download/<url> 会 404。
-        # 这里统一改写成 GitHub 资产名，并校验对应文件确实存在。
+        # 若清单仍写带空格的 url，客户端拼出的 releases/latest/download/<url> 会 404。
+        # 清单文件名随平台变化：Windows latest.yml、macOS latest-mac.yml、Linux latest-linux.yml。
         run: |
           set -euo pipefail
-          node scripts/ci/normalize-latest-yml.mjs --dir packages/desktop/dist
-          echo "=== latest.yml ==="
-          cat packages/desktop/dist/latest.yml
-          test -s packages/desktop/dist/latest.yml || { echo "::error::latest.yml 缺失或为空"; exit 1; }
+          case "${{ matrix.target }}" in
+            mac) manifest="latest-mac.yml" ;;
+            linux) manifest="latest-linux.yml" ;;
+            *) manifest="latest.yml" ;;
+          esac
+          node scripts/ci/normalize-latest-yml.mjs --dir packages/desktop/dist --file "$manifest"
+          echo "=== $manifest ==="
+          cat "packages/desktop/dist/$manifest"
+          test -s "packages/desktop/dist/$manifest" || { echo "::error::$manifest 缺失或为空"; exit 1; }
+
+      - name: Verify Linux update manifest points at AppImage
+        shell: bash
+        if: matrix.target == 'linux'
+        # electron-updater 在 Linux 上只认 AppImage 作为更新产物，deb 仅用于首次安装分发。
+        run: |
+          set -euo pipefail
+          manifest="packages/desktop/dist/latest-linux.yml"
+          if ! grep -q "\.AppImage" "$manifest"; then
+            echo "::error::latest-linux.yml 未指向 AppImage 产物，electron-updater 无法在 Linux 上更新"
+            exit 1
+          fi
 
       - name: Verify renderer build output
         shell: bash

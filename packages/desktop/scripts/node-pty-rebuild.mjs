@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { access } from "node:fs/promises";
-import { dirname, join, normalize, posix as posixPath, sep } from "node:path";
+import { dirname, join, normalize, posix as posixPath, resolve, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -97,6 +98,43 @@ function runElectronRebuild() {
   });
 }
 
+/**
+ * 判断 rebuild 失败后是否还有可用的预编译产物兜底。
+ *
+ * node-pty 1.1 用的是 N-API，预编译产物跨 Electron 版本通用：
+ * - macOS 自带 `prebuilds/darwin-*`；
+ * - Linux 的预编译来自 `@lydell/node-pty-linux-*`，由 beforePack 复制进 node-pty 目录。
+ * CI 的 Linux runner 不保证有完整编译链（node-gyp 需要 python/make/g++），
+ * rebuild 失败不该让整个 `pnpm install` 挂掉——打包最终用的是这些预编译产物。
+ */
+function hasPrebuildFallback({ platform, arch, nodePtyRoot }) {
+  const ownPrebuild = getNodePtyPrebuildPath({ platform, arch, nodePtyRoot });
+  if (existsSync(ownPrebuild)) {
+    return ownPrebuild;
+  }
+  if (platform === "linux") {
+    const platformKey = `${platform}-${arch}`;
+    // node_modules 布局有两种：hoisted 时 @lydell 与 node-pty 同级，
+    // pnpm 默认布局时 @lydell 在 node_modules 根、node-pty 在 .pnpm 下。逐个试。
+    for (const candidateRoot of [
+      resolve(nodePtyRoot, "..", "@lydell"),
+      resolve(nodePtyRoot, "..", "..", "..", "..", "@lydell"),
+    ]) {
+      const candidate = resolve(
+        candidateRoot,
+        `node-pty-${platformKey}`,
+        "prebuilds",
+        platformKey,
+        "pty.node",
+      );
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
 export async function main() {
   const decision = await resolveNodePtyRebuildDecision();
 
@@ -109,7 +147,23 @@ export async function main() {
   }
 
   console.log(`[node-pty] run electron-rebuild (${decision.reason}): ${decision.prebuildPath}`);
-  await runElectronRebuild();
+  try {
+    await runElectronRebuild();
+  } catch (error) {
+    const fallback = hasPrebuildFallback({
+      platform: process.platform,
+      arch: process.arch,
+      nodePtyRoot: resolveNodePtyRoot(),
+    });
+    if (!fallback) {
+      throw error;
+    }
+    // 没有编译链的 CI runner 上 rebuild 会失败，但打包用的是预编译产物，继续安装即可。
+    console.warn(
+      `[node-pty] electron-rebuild 失败，改用预编译产物继续: ${fallback}\n` +
+        `[node-pty] ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 const currentFilePath = fileURLToPath(import.meta.url);

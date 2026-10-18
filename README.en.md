@@ -91,8 +91,15 @@ modelChain:
 
 **For users who want to try the enhanced features without building from source**
 
-Download `ZCode.Preview-<version>-win-x64.exe` from this repository's
-[Releases](https://github.com/li5135580/ZCode/releases/latest) and install it.
+Download the package for your platform from this repository's
+[Releases](https://github.com/li5135580/ZCode/releases/latest):
+
+| Platform | Artifact | Notes |
+| --- | --- | --- |
+| Windows x64 | `ZCode.Preview-<version>-win-x64.exe` | NSIS installer |
+| macOS arm64 | `ZCode.Preview-<version>-mac-arm64.dmg` | Apple Silicon; unsigned, requires manual Gatekeeper approval |
+| Linux x64 | `ZCode.Preview-<version>-linux-x64.AppImage` | Portable; `chmod +x` then run. Also the auto-update artifact format |
+| Linux x64 | `ZCode.Preview-<version>-linux-x64.deb` | Debian/Ubuntu first install; auto-update still uses the AppImage |
 
 The installer is **built from this fork's source by CI** (not a patch applied on top of the
 official package), so the enhanced features are already included:
@@ -109,10 +116,17 @@ official package), so the enhanced features are already included:
   choose "More info → Run anyway". If you run third-party antivirus software (e.g. Huorong),
   the first launch can be slower than usual while it scans the newly written files — this is
   expected.
+- **macOS ships arm64 only**: Intel Macs are no longer sold and get no separate build. The
+  artifact carries only an ad-hoc signature (required on Apple Silicon), with no Developer ID
+  signature or notarization, so Gatekeeper blocks the first launch. Right-click → Open, or run
+  `xattr -rd com.apple.quarantine "/Applications/ZCode Preview.app"`.
+- **Linux ships AppImage and deb only**: rpm/pacman need extra packaging tools on the build
+  machine and are not part of CI.
 - **Auto-update works**: the update feed points at this repository's Releases and can be
-  checked manually from the app menu, tray, or Help menu. The installer version is injected at
-  build time (`<upstream patch+1>-fork.N`), so it is strictly increasing in semver terms and
-  installed clients receive updates normally.
+  checked manually from the app menu, tray, or Help menu. Each platform reads its own update
+  manifest (Windows `latest.yml`, macOS `latest-mac.yml`, Linux `latest-linux.yml`). The
+  installer version is injected at build time (`<upstream patch+1>-fork.N`), so it is strictly
+  increasing in semver terms and installed clients receive updates normally.
 - **Upgrading from a 3.15.1 build needs one manual step**: that build's updater was never
   initialized, so download the new installer and install over it. Auto-update takes effect
   from that version onward.
@@ -295,6 +309,17 @@ pnpm bundle:desktop -- --help
 ```
 
 The default target is macOS arm64, and the default output directory is `packages/desktop/dist/`. `--os` accepts `mac`, `win`, or `linux`; `--arch` accepts `x64` or `arm64`. Packaging and signing require the tools and configuration for the target platform.
+
+Linux produces AppImage, deb, rpm, and pacman by default. CI builds only the first two (rpm needs `rpmbuild` and `xz`, pacman needs extra tooling), which can be narrowed with an environment variable:
+
+```bash
+# AppImage and deb only
+ZCODE_LINUX_TARGETS="AppImage,deb" pnpm bundle:desktop -- --os linux --arch x64
+```
+
+Without a real signing identity (`ZCODE_ENABLE_MAC_SIGN` plus an identity), arm64 artifacts fall
+back to an ad-hoc signature — Apple Silicon refuses to run unsigned Mach-O binaries, so this
+layer cannot be skipped.
 
 ### ZCode CLI distribution
 

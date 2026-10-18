@@ -60,6 +60,34 @@ const macSigningIdentity =
   rawMacSigningIdentity?.replace(/^Developer ID Application:\s*/, "") ?? null;
 const shouldEnableMacSigning =
   process.env.ZCODE_ENABLE_MAC_SIGN === "1" && Boolean(macSigningIdentity);
+/**
+ * 未启用正式签名时 macOS 用的签名身份。
+ *
+ * arm64 的 Mach-O 至少需要 ad-hoc 签名才能被系统加载；而 electron-builder 遇到
+ * `identity: null` 会直接跳过签名阶段（macPackager 的 null 分支早于 ad-hoc 回退），
+ * 产出的 .app 在 Apple Silicon 上会被系统直接终止。这里对 arm64 显式传 `-`（ad-hoc），
+ * x64 仍留 null —— Intel 上没有这条硬性约束，跳过签名可省掉一轮 codesign。
+ */
+const macUnsignedIdentity = targetPlatform.arch === "arm64" ? "-" : null;
+/**
+ * Linux 打包目标可由 `ZCODE_LINUX_TARGETS` 收窄（逗号分隔，如 `AppImage,deb`）。
+ *
+ * 默认仍是全量格式，保证既有内部流水线行为不变；二开的 GitHub Actions 只出
+ * AppImage + deb —— rpm 需要 runner 预装 rpmbuild 与 xz，pacman 也需要额外工具，
+ * 对只做分发验证的场景是不必要的构建面。
+ */
+const linuxTargets = (() => {
+  const raw = process.env.ZCODE_LINUX_TARGETS?.trim();
+  if (!raw) return ["AppImage", "deb", "rpm", "pacman"];
+  const parsed = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (parsed.length === 0) {
+    throw new Error(`ZCODE_LINUX_TARGETS 解析后为空: ${raw}`);
+  }
+  return parsed;
+})();
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 const desktopPackageRoot = import.meta.dirname;
 // Computer Use Helper（macOS .app、Windows runtime）只随真实 producer 打包；开源占位包下跳过随包资源与校验。
@@ -713,13 +741,18 @@ export default {
                 },
               ]
             : []),
-          {
-            // CUA 权限浮窗的吸附数据源（CGWindowListCopyWindowInfo，不需要任何 TCC 权限）。
-            // 主进程按 process.resourcesPath 解析；缺失时 watcher fail-open，浮窗仍可用
-            // 只是不吸附，所以这里不做存在性断言。
-            from: "resources/macos-window-bounds/zcode-window-bounds",
-            to: "macos-window-bounds/zcode-window-bounds",
-          },
+          // CUA 权限浮窗的吸附数据源（CGWindowListCopyWindowInfo，不需要任何 TCC 权限）。
+          // 主进程按 process.resourcesPath 解析；缺失时 watcher fail-open，浮窗仍可用
+          // 只是不吸附。构建机没有 swiftc 时 prepare:macos-window-bounds 会跳过编译，
+          // 这里随之跳过拷贝，否则 electron-builder 会因源文件不存在而打包失败。
+          ...(existsSync(resolve(desktopPackageRoot, "resources/macos-window-bounds/zcode-window-bounds"))
+            ? [
+                {
+                  from: "resources/macos-window-bounds/zcode-window-bounds",
+                  to: "macos-window-bounds/zcode-window-bounds",
+                },
+              ]
+            : []),
         ]
       : []),
     {
@@ -830,7 +863,8 @@ export default {
     // z-code 之前只有本地未签名打包配置，CI 即使注入了证书变量，
     // electron-builder 也不会自动切到 hardened runtime / entitlement 这套发布参数。
     // 这里显式收拢到环境开关，保证本地开发不被签名配置绑死，CI 发布时再按需打开。
-    identity: shouldEnableMacSigning ? macSigningIdentity : null,
+    // 未启用正式签名时也不能一律置 null：arm64 需要 ad-hoc 签名，见 macUnsignedIdentity。
+    identity: shouldEnableMacSigning ? macSigningIdentity : macUnsignedIdentity,
     // macOS 产物采用“build 阶段签名 + 独立公证阶段”的两段式流水线。
     // 如果这里不显式关闭 electron-builder 内置 notarize，它会在 build 阶段读取 Apple 凭据后直接尝试公证，
     // 并强制要求 APPLE_APP_SPECIFIC_PASSWORD，导致 build 还没产出 DMG 就提前失败。
@@ -868,7 +902,7 @@ export default {
       : {}),
   },
   linux: {
-    target: ["AppImage", "deb", "rpm", "pacman"],
+    target: linuxTargets,
     artifactName: buildDesktopArtifactName("linux"),
     // desktop 包名是 scoped package（@zcode/desktop），electron-builder 默认会把
     // Linux executable/Icon 推成 @zcodedesktop。部分桌面环境无法按这个 icon name 命中

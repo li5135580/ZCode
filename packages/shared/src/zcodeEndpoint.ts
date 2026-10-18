@@ -19,6 +19,25 @@ export const DEFAULT_UPDATE_FEED_URL =
   "https://github.com/li5135580/ZCode/releases/latest/download/latest.yml";
 export const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
 
+/**
+ * 按运行平台推导默认更新清单地址。
+ *
+ * electron-builder 为不同平台生成不同文件名的清单：Windows `latest.yml`、
+ * macOS `latest-mac.yml`、Linux `latest-linux.yml`（arm64 为 `latest-linux-arm64.yml`）。
+ * 用 Windows 的清单去驱动 macOS/Linux 的更新检查会拿到错误的安装包。
+ */
+export function resolveDefaultUpdateFeedUrl(
+  platform: string = process.platform,
+  arch: string = process.arch,
+): string {
+  const base = DEFAULT_UPDATE_FEED_URL.replace(/\/latest\.yml$/, "");
+  if (platform === "darwin") return `${base}/latest-mac.yml`;
+  if (platform === "linux") {
+    return `${base}/${arch === "arm64" ? "latest-linux-arm64.yml" : "latest-linux.yml"}`;
+  }
+  return DEFAULT_UPDATE_FEED_URL;
+}
+
 export interface BuildZCodeEndpointUrlsOptions {
   appVersion?: string;
 }

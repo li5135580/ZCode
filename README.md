@@ -83,8 +83,14 @@ modelChain:
 
 **适合用户**：想快速体验二开功能，不想自己构建
 
-从本仓库的 [Releases](https://github.com/li5135580/ZCode/releases/latest) 下载
-`ZCode.Preview-<版本>-win-x64.exe` 并安装即可。
+从本仓库的 [Releases](https://github.com/li5135580/ZCode/releases/latest) 下载对应平台的安装包：
+
+| 平台 | 产物 | 说明 |
+| --- | --- | --- |
+| Windows x64 | `ZCode.Preview-<版本>-win-x64.exe` | NSIS 安装包 |
+| macOS arm64 | `ZCode.Preview-<版本>-mac-arm64.dmg` | Apple Silicon；未签名，首次打开需手动放行 |
+| Linux x64 | `ZCode.Preview-<版本>-linux-x64.AppImage` | 免安装，`chmod +x` 后直接运行，也是自动更新的产物格式 |
+| Linux x64 | `ZCode.Preview-<版本>-linux-x64.deb` | Debian/Ubuntu 首次安装用，自动更新仍走 AppImage |
 
 该安装包由本仓库的 CI 从二开源码完整构建（不是对官方包打补丁），二开功能已内置：
 
@@ -99,9 +105,15 @@ modelChain:
 - 安装包**未做代码签名**。Windows 首次运行可能出现 SmartScreen 提示，
   需选择「更多信息 → 仍要运行」；若装有第三方杀毒软件（如火绒），
   首次启动可能因实时扫描较慢，属正常现象。
+- **macOS 只有 arm64**：Intel Mac 已停止出货，未单独出包。产物只做了 ad-hoc 签名
+  （Apple Silicon 的硬性要求），没有 Developer ID 签名与公证，首次打开会被 Gatekeeper
+  拦截，需右键「打开」或执行
+  `xattr -rd com.apple.quarantine "/Applications/ZCode Preview.app"`。
+- **Linux 只出 AppImage 与 deb**：rpm / pacman 需要构建机预装额外打包工具，暂未纳入 CI。
 - **自动更新可用**：更新源指向本仓库 Releases，可从应用菜单、托盘或帮助菜单手动检查。
-  安装包的版本号由构建期注入（`<上游版本 patch+1>-fork.N`），保证在 semver 上严格递增，
-  因此装过旧包的机器可以正常收到更新。
+  各平台读取各自的更新清单（Windows `latest.yml`、macOS `latest-mac.yml`、
+  Linux `latest-linux.yml`）。安装包的版本号由构建期注入（`<上游版本 patch+1>-fork.N`），
+  保证在 semver 上严格递增，因此装过旧包的机器可以正常收到更新。
 - **从 3.15.1 旧包升级需手动一次**：旧包的 updater 从未初始化，需下载新包覆盖安装；
   从该版本起自动更新链路才生效。
 
@@ -285,11 +297,21 @@ pnpm bundle:desktop -- --help
 
 默认目标为 macOS arm64，默认输出目录为 `packages/desktop/dist/`。`--os` 支持 `mac`、`win`、`linux`，`--arch` 支持 `x64`、`arm64`；实际打包与签名需要目标平台对应的工具和配置。
 
+Linux 默认产出 AppImage、deb、rpm、pacman 四种格式。CI 只构建前两种（rpm 需要 `rpmbuild` 与 `xz`，pacman 需要额外工具），可用环境变量收窄：
+
+```bash
+# 只出 AppImage 与 deb
+ZCODE_LINUX_TARGETS="AppImage,deb" pnpm bundle:desktop -- --os linux --arch x64
+```
+
 安装：双击打开产物 DMG，将 ZCode 拖入"应用程序"。本地构建未签名，首次打开若被 macOS 拦截，执行：
 
 ```bash
 sudo xattr -rd com.apple.quarantine /Applications/ZCode.app
 ```
+
+未启用正式签名（`ZCODE_ENABLE_MAC_SIGN` 与签名身份）时，arm64 产物会自动使用 ad-hoc 签名 ——
+Apple Silicon 的 Mach-O 没有签名会被系统直接终止，所以这一层不能省。
 
 ### ZCode 命令行版
 
