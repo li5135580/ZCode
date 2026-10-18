@@ -204,6 +204,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          # Release 正文取仓库维护的 RELEASE-NOTES.md（发版时随代码一起更新），
+          # 而不是 generate_release_notes 自动生成的空壳正文——后者只有一行
+          # compare 链接，用户看不到产物清单与安装注意事项。
+          body_path: RELEASE-NOTES.md
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
@@ -216,4 +220,3 @@ jobs:
             # 配置生成，客户端默认从 releases/latest/download/latest.yml 读取。
             artifacts/**/*.yml
             artifacts/**/*.blockmap
-          generate_release_notes: true
