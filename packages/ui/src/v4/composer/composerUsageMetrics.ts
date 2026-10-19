@@ -30,18 +30,25 @@ export const DEFAULT_USAGE_BAR_ITEMS: Record<UsageBarItem, boolean> = {
   sub: false,
 };
 
+/** 状态条字号档位；12px 为默认值，比输入框正文小一档但仍清晰可读。 */
+export const USAGE_BAR_FONT_SIZES = [10, 11, 12, 13, 14] as const;
+export const DEFAULT_USAGE_BAR_FONT_SIZE = 12;
+
 export interface UsageBarSettings {
   items: Record<UsageBarItem, boolean>;
   /** 上下文窗口容量覆盖；null = 自动（用模型配置/快照值）。 */
   contextWindowOverride: number | null;
   /** token 数量是否用中文万/亿单位（仅中文界面生效）。 */
   useChineseUnits: boolean;
+  /** 状态条字号（px）。 */
+  fontSize: number;
 }
 
 export const DEFAULT_USAGE_BAR_SETTINGS: UsageBarSettings = {
   items: { ...DEFAULT_USAGE_BAR_ITEMS },
   contextWindowOverride: null,
   useChineseUnits: true,
+  fontSize: DEFAULT_USAGE_BAR_FONT_SIZE,
 };
 
 const USAGE_BAR_SETTINGS_KEY = "zcode.composerUsageBar.settings.v1";
@@ -63,6 +70,7 @@ export function parseUsageBarSettings(raw: string | null | undefined): UsageBarS
       }
     }
     const override = parsed.contextWindowOverride;
+    const rawFontSize = parsed.fontSize;
     return {
       items,
       contextWindowOverride:
@@ -70,6 +78,10 @@ export function parseUsageBarSettings(raw: string | null | undefined): UsageBarS
           ? Math.floor(override)
           : null,
       useChineseUnits: parsed.useChineseUnits !== false,
+      fontSize:
+        typeof rawFontSize === "number" && Number.isFinite(rawFontSize)
+          ? Math.min(Math.max(Math.round(rawFontSize), 9), 18)
+          : DEFAULT_USAGE_BAR_FONT_SIZE,
     };
   } catch {
     return { ...DEFAULT_USAGE_BAR_SETTINGS, items: { ...DEFAULT_USAGE_BAR_ITEMS } };
@@ -156,6 +168,19 @@ export function resolveSpeedTier(tokensPerSecond: number | null): UsageTier {
   return "ok";
 }
 
+/**
+ * 缓存命中率分档。
+ *
+ * 命中越高越省成本，因此高值用正常色、低值用告警色：<20% 红、<50% 黄、其余绿。
+ * 没有数据（null）时不上色，避免把「未知」误读成「很差」。
+ */
+export function resolveCacheTier(hitRate: number | null): UsageTier {
+  if (hitRate === null) return "ok";
+  if (hitRate < 0.2) return "hot";
+  if (hitRate < 0.5) return "warm";
+  return "ok";
+}
+
 // ── 日期与今日用量 ────────────────────────────────────────────────────
 
 /** 本地时区下的 `YYYY-MM-DD`；热力图的 date 字段就是这个格式。 */
@@ -216,7 +241,6 @@ export function resolveTodayUsage(
 export function isTurnEndPhase(phase: string | null | undefined): boolean {
   return phase === "completedSuccess" || phase === "completedInterrupted" || phase === "error";
 }
-
 export function isTurnRunningPhase(phase: string | null | undefined): boolean {
   return phase === "running" || phase === "prewarming";
 }
@@ -325,10 +349,19 @@ export function resolveLatestTurnDetail(
     if (round.generationDurationMs !== null) {
       generationDurationMs = (generationDurationMs ?? 0) + round.generationDurationMs;
     }
+    // 多段时取最后一段的有效值——与状态条「最近一次完成请求」口径一致。
+    // 最新一段缺首字延迟时 tokensPerSecond 为 null，此时保留前一段的有效值，
+    // 而不是把整轮速率清空（否则用户会看到「明明在跑，速度却是 —」）。
     if (round.tokensPerSecond !== null) {
-      // 多段时取最后一段的有效值——与状态条「最近一次完成请求」口径一致。
       tokensPerSecond = round.tokensPerSecond;
     }
+  }
+
+  // 所有段都没有可信速率时，用本轮累计输出 ÷ 累计生成耗时兜底。
+  // 这是同一口径的聚合值，比显示占位符更有信息量。
+  if (tokensPerSecond === null && generationDurationMs !== null && generationDurationMs > 0) {
+    const fallback = (outputTokens * 1000) / generationDurationMs;
+    tokensPerSecond = Number.isFinite(fallback) ? fallback : null;
   }
 
   const cacheHitRate = inputTokens > 0 ? cacheReadTokens / inputTokens : null;

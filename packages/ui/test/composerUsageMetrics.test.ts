@@ -9,6 +9,7 @@ import {
   isTurnEndPhase,
   isTurnRunningPhase,
   parseUsageBarSettings,
+  resolveCacheTier,
   resolveContextMaxTokens,
   resolveContextTier,
   resolveContextUsageRatio,
@@ -127,6 +128,14 @@ describe("composer 用量状态条计算", () => {
         .contextWindowOverride).toBeNull();
     });
 
+    it("字号默认 12px，并夹在合理范围内", () => {
+      expect(parseUsageBarSettings(null).fontSize).toBe(12);
+      expect(parseUsageBarSettings(JSON.stringify({ fontSize: 14 })).fontSize).toBe(14);
+      expect(parseUsageBarSettings(JSON.stringify({ fontSize: 2 })).fontSize).toBe(9);
+      expect(parseUsageBarSettings(JSON.stringify({ fontSize: 99 })).fontSize).toBe(18);
+      expect(parseUsageBarSettings(JSON.stringify({ fontSize: "big" })).fontSize).toBe(12);
+    });
+
     it("显示项清单覆盖插件里的七项", () => {
       expect([...USAGE_BAR_ITEMS]).toEqual([
         "ctx",
@@ -162,6 +171,13 @@ describe("composer 用量状态条计算", () => {
       expect(resolveSpeedTier(40)).toBe("warm");
       expect(resolveSpeedTier(100)).toBe("ok");
       expect(resolveSpeedTier(null)).toBe("ok");
+    });
+
+    it("缓存命中按 20%/50% 分档，未知不上色", () => {
+      expect(resolveCacheTier(0.1)).toBe("hot");
+      expect(resolveCacheTier(0.3)).toBe("warm");
+      expect(resolveCacheTier(0.8)).toBe("ok");
+      expect(resolveCacheTier(null)).toBe("ok");
     });
   });
 
@@ -285,6 +301,26 @@ describe("composer 用量状态条计算", () => {
     it("输入为 0 时缓存命中率为 null 而不是 Infinity", () => {
       const detail = resolveLatestTurnDetail(buildDebug([{ recordedAt: 1, input: 0, output: 5 }]));
       expect(detail?.cacheHitRate).toBeNull();
+    });
+
+    it("最新一段缺速率时保留前一段的有效值", () => {
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 100, output: 50, duration: 500, tps: 100 },
+        // 这一段缺首字延迟，tokensPerSecond 为 null
+        { recordedAt: 2000, input: 100, output: 80, duration: 500, tps: null },
+      ]);
+
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBe(100);
+    });
+
+    it("所有段都没有速率时用累计输出 ÷ 累计生成耗时兜底", () => {
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 100, output: 100, duration: 500, tps: null },
+        { recordedAt: 2000, input: 100, output: 100, duration: 500, tps: null },
+      ]);
+
+      // 200 tokens / 1000ms = 200 tok/s
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeCloseTo(200);
     });
   });
 

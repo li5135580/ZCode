@@ -22,6 +22,7 @@ import {
   formatRate,
   formatTokens,
   isContextExceededActive,
+  resolveCacheTier,
   resolveContextMaxTokens,
   resolveContextTier,
   resolveContextUsageRatio,
@@ -29,6 +30,7 @@ import {
   resolveSessionTotals,
   resolveSpeedTier,
   resolveTodayUsage,
+  USAGE_BAR_FONT_SIZES,
   USAGE_BAR_ITEMS,
   writeUsageBarSettings,
   type UsageBarItem,
@@ -60,18 +62,12 @@ const TIER_BG: Record<UsageTier, string> = {
   warm: "bg-[#f5b944]",
   hot: "bg-[#ff6b57]",
 };
-/** 上下文胶囊底色：按档位淡淡铺一层，让占比一眼可辨。 */
-const TIER_PILL: Record<UsageTier, string> = {
-  ok: "bg-[#3ecf8e]/12",
-  warm: "bg-[#f5b944]/12",
-  hot: "bg-[#ff6b57]/14",
-};
 
 /**
  * 单个指标。
  *
- * 视觉层级参考 zcode-token-usage-statusbar：图标 + 加粗主值 + 弱化次要值，
- * 字号跟随客户端 ui-base（14px），条目有 hover 底色提示可交互。
+ * 图标 + 文字标签 + 加粗数值，条目本身是 hover 胶囊；分隔线在换行时会落到行首，
+ * 因此改用间距 + 胶囊底色区分，保证任意宽度下换行后依然整齐。
  */
 function Item({
   icon,
@@ -86,11 +82,11 @@ function Item({
 }) {
   return (
     <span
-      className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-hover"
+      className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-hover"
       title={title}
       data-testid={testId}
     >
-      <span className="text-foreground-subtle/60" aria-hidden="true">
+      <span className="text-foreground-subtle/55" aria-hidden="true">
         {icon}
       </span>
       {children}
@@ -98,32 +94,34 @@ function Item({
   );
 }
 
-function Sep() {
-  return <span className="h-3.5 w-px shrink-0 bg-border" aria-hidden="true" />;
+/** 指标名：弱化但保持可读，让「速度/本轮/会话」这类作用域一眼可辨。 */
+function Label({ children }: { children: React.ReactNode }) {
+  return <span className="text-foreground-subtle/75">{children}</span>;
 }
 
 /** 主值：加粗、跟随前景色，是条面上唯一的高对比文字。 */
 function Value({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("font-semibold text-foreground tabular-nums", className)}>
-      {children}
-    </span>
+    <span className={cn("font-semibold text-foreground tabular-nums", className)}>{children}</span>
   );
 }
 
 /** 次要值：单位、次数这类补充信息，弱化但不至于看不见。 */
-function Sub({ children }: { children: React.ReactNode }) {
-  return <span className="text-foreground-subtle/80 tabular-nums">{children}</span>;
+function Sub({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={cn("text-foreground-subtle/80 tabular-nums", className)}>{children}</span>
+  );
 }
 
 /**
  * composer 下方的 token 用量状态条。
  *
  * 设计取舍：
- * - 视觉对齐插件的「图标 + 加粗值 + 分隔线」结构，字号用 ui-base 保证可读；
- * - 指标可逐项开关，设置存 localStorage（设备级偏好）；
- * - 数据全部本地可得，不上传、不联网；
- * - 每轮结束刷新一次，运行中不轮询。
+ * - 全部指标在输入框下方居中、可换行，宽度不足时自动折成多行而不是被裁掉；
+ * - 默认 12px，可在设置里逐档调整；
+ * - 缓存命中、输入/输出、请求段数、耗时这些原本只在 hover 里出现的数据，
+ *   直接铺到主条面，减少「要悬停才知道」的隐藏信息；
+ * - 数据全部本地可得，不上传、不联网；每轮结束刷新一次，运行中不轮询。
  */
 export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   usage,
@@ -214,11 +212,24 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     [settings, updateSettings],
   );
 
+  const setFontSize = useCallback(
+    (fontSize: number) => {
+      const next: UsageBarSettings = { ...settings, fontSize };
+      updateSettings(next);
+      writeUsageBarSettings(next);
+    },
+    [settings, updateSettings],
+  );
+
   if (!enabled || !available) {
     return null;
   }
 
   const tokens = (value: number) => formatTokens(locale, value, settings.useChineseUnits);
+  // 0% 可能只是该模型/供应商不上报缓存，不等于命中很差；这时保持中性色，
+  // 只有确实命中过、但比例偏低才用告警色，避免把「不支持」误报成「很差」。
+  const cacheToneClass = (rate: number | null) =>
+    rate !== null && rate > 0 ? TIER_TEXT[resolveCacheTier(rate)] : "text-foreground";
   const placeholder = "—";
   const anyItemVisible = USAGE_BAR_ITEMS.some((item) => settings.items[item]);
 
@@ -228,10 +239,11 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="speed"
-        icon={<Zap className="size-3.5" />}
+        icon={<Zap className="size-[1.15em]" />}
         title={intl.formatMessage({ id: "chat.composerUsage.speedTitle" })}
         testId="usage-item-speed"
       >
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.speed" })}</Label>
         <Value className={TIER_TEXT[speedTier]}>
           {effectiveRate === null ? placeholder : formatRate(locale, effectiveRate)}
         </Value>
@@ -244,7 +256,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="ctx"
-        icon={<Activity className="size-3.5" />}
+        icon={<Activity className="size-[1.15em]" />}
         title={
           contextMax === null
             ? intl.formatMessage({ id: "chat.composerUsage.contextTitle" })
@@ -258,22 +270,22 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
         }
         testId="usage-item-ctx"
       >
-        <span
-          className={cn(
-            "flex items-center gap-1.5 rounded px-1.5 py-0.5",
-            TIER_PILL[contextTier],
-          )}
-        >
-          <span className="h-1 w-8 overflow-hidden rounded-full bg-foreground/15" aria-hidden="true">
-            <span
-              className={cn("block h-full transition-[width] duration-300", TIER_BG[contextTier])}
-              style={{ width: `${Math.round((contextRatio ?? 0) * 100)}%` }}
-            />
-          </span>
-          <Value className={TIER_TEXT[contextTier]}>
-            {contextRatio === null ? placeholder : formatPercent("en-US", contextRatio)}
-          </Value>
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.context" })}</Label>
+        <span className="h-1 w-7 overflow-hidden rounded-full bg-foreground/15" aria-hidden="true">
+          <span
+            className={cn("block h-full transition-[width] duration-300", TIER_BG[contextTier])}
+            style={{ width: `${Math.round((contextRatio ?? 0) * 100)}%` }}
+          />
         </span>
+        <Value className={TIER_TEXT[contextTier]}>
+          {contextRatio === null ? placeholder : formatPercent("en-US", contextRatio)}
+        </Value>
+        {contextMax === null || !usage?.contextWindow ? null : (
+          // 用量与上限同时铺出来，不用悬停才知道「66% 到底是多少 token」。
+          <Sub>
+            {tokens(usage.contextWindow.usedTokens)}/{tokens(contextMax)}
+          </Sub>
+        )}
       </Item>,
     );
   }
@@ -283,7 +295,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="turn"
-        icon={<MessageSquare className="size-3.5" />}
+        icon={<MessageSquare className="size-[1.15em]" />}
         title={
           detail
             ? intl.formatMessage(
@@ -306,10 +318,40 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
         }
         testId="usage-item-turn"
       >
-        <Value>{detail ? tokens(detail.outputTokens) : placeholder}</Value>
-        {detail && detail.cacheHitRate !== null ? (
-          <Sub>{formatPercent(locale, detail.cacheHitRate)}</Sub>
-        ) : null}
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.turn" })}</Label>
+        {detail ? (
+          <>
+            <Sub>↑</Sub>
+            <Value>{tokens(detail.inputTokens)}</Value>
+            <Sub>↓</Sub>
+            <Value>{tokens(detail.outputTokens)}</Value>
+            <Label>{intl.formatMessage({ id: "chat.composerUsage.cacheHit" })}</Label>
+            <Value className={cacheToneClass(detail.cacheHitRate)}>
+              {detail.cacheHitRate === null ? placeholder : formatPercent(locale, detail.cacheHitRate)}
+            </Value>
+            {detail.generationDurationMs === null ? null : (
+              <Sub>{formatDuration(detail.generationDurationMs / 1000)}</Sub>
+            )}
+            {detail.requestCount > 1 ? (
+              <Sub>
+                {intl.formatMessage(
+                  { id: "chat.composerUsage.segmentUnit" },
+                  { count: detail.requestCount },
+                )}
+              </Sub>
+            ) : null}
+          </>
+        ) : turnRate ? (
+          // 逐轮明细只存在于 agent 进程内，重启后为空；此时用本轮累计增量兜底，
+          // 至少让「本轮输出了多少、花了多久」仍然可见。
+          <>
+            <Sub>↓</Sub>
+            <Value>{tokens(turnRate.outputTokens)}</Value>
+            <Sub>{formatDuration(turnRate.durationMs / 1000)}</Sub>
+          </>
+        ) : (
+          <Value>{placeholder}</Value>
+        )}
       </Item>,
     );
   }
@@ -318,7 +360,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="session"
-        icon={<Activity className="size-3.5" />}
+        icon={<Activity className="size-[1.15em]" />}
         title={
           sessionTotals
             ? intl.formatMessage(
@@ -335,15 +377,29 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
         }
         testId="usage-item-session"
       >
-        <Value>{sessionTotals ? tokens(sessionTotals.outputTokens) : placeholder}</Value>
-        {sessionTotals?.requestCount != null ? (
-          <Sub>
-            {intl.formatMessage(
-              { id: "chat.composerUsage.requestCount" },
-              { count: sessionTotals.requestCount },
-            )}
-          </Sub>
-        ) : null}
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.session" })}</Label>
+        {sessionTotals ? (
+          <>
+            <Sub>↑</Sub>
+            <Value>{tokens(sessionTotals.inputTokens)}</Value>
+            <Sub>↓</Sub>
+            <Value>{tokens(sessionTotals.outputTokens)}</Value>
+            <Label>{intl.formatMessage({ id: "chat.composerUsage.cacheHit" })}</Label>
+            <Value className={cacheToneClass(sessionHitRate)}>
+              {sessionHitRate === null ? placeholder : formatPercent(locale, sessionHitRate)}
+            </Value>
+            {sessionTotals.requestCount != null ? (
+              <Sub>
+                {intl.formatMessage(
+                  { id: "chat.composerUsage.requestCount" },
+                  { count: sessionTotals.requestCount },
+                )}
+              </Sub>
+            ) : null}
+          </>
+        ) : (
+          <Value>{placeholder}</Value>
+        )}
       </Item>,
     );
   }
@@ -352,10 +408,11 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="tools"
-        icon={<Wrench className="size-3.5" />}
+        icon={<Wrench className="size-[1.15em]" />}
         title={intl.formatMessage({ id: "chat.composerUsage.toolsTitle" })}
         testId="usage-item-tools"
       >
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.tools" })}</Label>
         <Value>{today.toolCallCount > 0 ? today.toolCallCount : placeholder}</Value>
         <Sub>{intl.formatMessage({ id: "chat.composerUsage.callUnit" })}</Sub>
       </Item>,
@@ -366,7 +423,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="today"
-        icon={<CalendarDays className="size-3.5" />}
+        icon={<CalendarDays className="size-[1.15em]" />}
         title={
           todaySnapshot
             ? intl.formatMessage(
@@ -377,7 +434,13 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
         }
         testId="usage-item-today"
       >
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.today" })}</Label>
         <Value>{todaySnapshot ? tokens(today.totalTokens) : placeholder}</Value>
+        {todaySnapshot && today.turnCount > 0 ? (
+          <Sub>
+            {intl.formatMessage({ id: "chat.composerUsage.turnUnit" }, { count: today.turnCount })}
+          </Sub>
+        ) : null}
       </Item>,
     );
   }
@@ -388,7 +451,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     groups.push(
       <Item
         key="sub"
-        icon={<Bot className="size-3.5" />}
+        icon={<Bot className="size-[1.15em]" />}
         title={
           subagents
             ? intl.formatMessage(
@@ -401,7 +464,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
       >
         <span
           className={cn(
-            "inline-block size-2 rounded-full",
+            "inline-block size-1.5 rounded-full",
             attention
               ? "animate-pulse bg-[#f5b944]"
               : runningCount > 0
@@ -410,7 +473,16 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
           )}
           aria-hidden="true"
         />
+        <Label>{intl.formatMessage({ id: "chat.composerUsage.sub" })}</Label>
         <Value>{runningCount > 0 ? runningCount : placeholder}</Value>
+        {subagents && subagents.endedTotal > 0 ? (
+          <Sub>
+            {intl.formatMessage(
+              { id: "chat.composerUsage.subCount" },
+              { running: runningCount, ended: subagents.endedTotal },
+            )}
+          </Sub>
+        ) : null}
       </Item>,
     );
   }
@@ -418,22 +490,17 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   return (
     <div
       data-testid={TID_V4_COMPOSER_USAGE_STATUS_BAR}
+      style={{ fontSize: settings.fontSize }}
       className={cn(
-        // 字号跟随客户端 ui-base（14px）。此前误用 ui-xs（约 10px），
-        // 比输入框正文小两级，读起来非常吃力。
-        "flex w-full items-center gap-0.5 overflow-hidden px-1 pt-1 text-ui-base leading-none text-foreground-subtle",
+        // 居中 + 可换行：内容宽度随指标增减动态变化，窗口窄时折行而不是裁切。
+        "flex w-full flex-wrap items-center justify-center gap-x-0.5 gap-y-0.5 px-1 pt-1 leading-[1.35] text-foreground-subtle",
         className,
       )}
     >
-      {groups.map((group, index) => (
-        <span key={index} className="flex min-w-0 items-center gap-0.5">
-          {index > 0 ? <Sep /> : null}
-          {group}
-        </span>
-      ))}
+      {groups}
 
       {!anyItemVisible ? (
-        <span className="truncate text-foreground-subtle/60">
+        <span className="px-1 text-foreground-subtle/60">
           {intl.formatMessage({ id: "chat.composerUsage.allHidden" })}
         </span>
       ) : null}
@@ -441,18 +508,15 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
       {contextExceeded ? (
         // 上下文超限：最近一次请求被拒。只给结论和出路，不堆错误原文——
         // 具体报错在会话的错误横幅里已有。
-        <>
-          <Sep />
-          <span
-            className="flex shrink-0 animate-pulse items-center gap-1 rounded-md px-1.5 py-0.5 text-[var(--color-destructive)]"
-            title={intl.formatMessage({ id: "chat.composerUsage.contextExceededHint" })}
-          >
-            <AlertTriangle className="size-3.5" aria-hidden="true" />
-            <span className="font-semibold">
-              {intl.formatMessage({ id: "chat.composerUsage.contextExceeded" })}
-            </span>
+        <span
+          className="flex shrink-0 animate-pulse items-center gap-1 rounded-md px-1.5 py-0.5 text-[var(--color-destructive)]"
+          title={intl.formatMessage({ id: "chat.composerUsage.contextExceededHint" })}
+        >
+          <AlertTriangle className="size-[1.15em]" aria-hidden="true" />
+          <span className="font-semibold">
+            {intl.formatMessage({ id: "chat.composerUsage.contextExceeded" })}
           </span>
-        </>
+        </span>
       ) : null}
 
       <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -460,13 +524,13 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
           <button
             type="button"
             aria-label={intl.formatMessage({ id: "chat.composerUsage.settings" })}
-            className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-foreground-subtle/70 transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-foreground-subtle/70 transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <Settings2 className="size-3.5" aria-hidden="true" />
-            <ChevronDown className="size-3" aria-hidden="true" />
+            <Settings2 className="size-[1.15em]" aria-hidden="true" />
+            <ChevronDown className="size-[1em]" aria-hidden="true" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="top" className="w-72 gap-2.5 p-3">
+        <PopoverContent align="center" side="top" className="w-72 gap-2.5 p-3">
           <div className="text-ui-sm font-semibold text-foreground">
             {intl.formatMessage({ id: "chat.composerUsage.settings" })}
           </div>
@@ -482,6 +546,31 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
                 </span>
               </label>
             ))}
+          </div>
+
+          <div className="my-0.5 h-px bg-border" />
+
+          <div className="flex items-center justify-between gap-2 text-ui-sm">
+            <span className="font-medium text-foreground">
+              {intl.formatMessage({ id: "chat.composerUsage.fontSize" })}
+            </span>
+            <div className="flex items-center gap-1">
+              {USAGE_BAR_FONT_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setFontSize(size)}
+                  className={cn(
+                    "rounded border px-1.5 py-0.5 tabular-nums transition-colors",
+                    settings.fontSize === size
+                      ? "border-ring bg-hover font-semibold text-foreground"
+                      : "border-border text-foreground-subtle hover:bg-hover",
+                  )}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="my-0.5 h-px bg-border" />

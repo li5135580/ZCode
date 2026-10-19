@@ -239,6 +239,27 @@ describe("ComposerUsageStatusBar", () => {
     expect(bar.textContent).toContain("8000");
   });
 
+  it("缓存命中率直接展示在主条面，不用悬停", async () => {
+    renderBar({ usage: createUsage() });
+
+    const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
+    await waitFor(() =>
+      expect(bar.querySelector('[data-testid="usage-item-turn"]')?.textContent).toContain("缓存"),
+    );
+    // 本轮 5000/10000 缓存命中 50%，会话 30000/120000 = 25%
+    expect(bar.querySelector('[data-testid="usage-item-turn"]')?.textContent).toContain("50%");
+    expect(bar.querySelector('[data-testid="usage-item-session"]')?.textContent).toContain("25%");
+  });
+
+  it("默认字号 12px，条面居中且允许换行", async () => {
+    renderBar({ usage: createUsage() });
+
+    const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
+    expect(bar.style.fontSize).toBe("12px");
+    expect(bar.className).toContain("justify-center");
+    expect(bar.className).toContain("flex-wrap");
+  });
+
   it("所有查询都失败时仍渲染状态条，不崩", async () => {
     const { services } = createServices({ failAll: true });
     renderBar({ usage: createUsage(), services });
