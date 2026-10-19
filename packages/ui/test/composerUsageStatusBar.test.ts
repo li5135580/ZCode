@@ -2,7 +2,7 @@
 import { createElement, type ReactNode } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AppUsageSnapshot } from "@zcode/shared";
+import type { AppUsageSnapshot, SessionDebugSnapshot } from "@zcode/shared";
 import type { SessionUsageState } from "@zcode/shared/zcode-protocol-v4";
 import type { IServiceAccessor } from "@zcode/services";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
@@ -10,9 +10,27 @@ import { ServiceProvider } from "@/hooks/useServices.js";
 import { TID_V4_COMPOSER_USAGE_STATUS_BAR } from "@zcode/shared/test-ids";
 import { ComposerUsageStatusBar } from "@/v4/composer/ComposerUsageStatusBar.js";
 
-vi.mock("@/ControlHintTooltip.js", () => ({
-  ControlHintTooltip: ({ children, title }: { children: ReactNode; title: string }) =>
-    createElement("span", { "data-tooltip-title": title }, children),
+vi.mock("@/components/ui/popover.js", () => ({
+  Popover: ({ children }: { children?: ReactNode }) => createElement("div", null, children),
+  PopoverTrigger: ({ children }: { children?: ReactNode }) => children,
+  PopoverContent: ({ children }: { children?: ReactNode }) =>
+    createElement("div", { "data-testid": "usage-settings-panel" }, children),
+}));
+
+vi.mock("@/components/ui/checkbox.js", () => ({
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+  }: {
+    checked?: boolean;
+    onCheckedChange?: (value: boolean) => void;
+  }) =>
+    createElement("input", {
+      type: "checkbox",
+      checked: Boolean(checked),
+      onChange: (event: { target: { checked: boolean } }) =>
+        onCheckedChange?.(event.target.checked),
+    }),
 }));
 
 function todayKey(): string {
@@ -23,7 +41,7 @@ function todayKey(): string {
   }).format(new Date());
 }
 
-function createSnapshot(todayTokens: number): AppUsageSnapshot {
+function createSnapshot(todayTokens: number, toolCallCount = 5): AppUsageSnapshot {
   return {
     range: "7d",
     generatedAt: 0,
@@ -64,7 +82,7 @@ function createSnapshot(todayTokens: number): AppUsageSnapshot {
               level: 1,
               totalTokens: todayTokens,
               turnCount: 3,
-              toolCallCount: 5,
+              toolCallCount,
             },
           ],
         },
@@ -73,6 +91,26 @@ function createSnapshot(todayTokens: number): AppUsageSnapshot {
     dailyModelUsage: [],
     models: [],
     tools: [],
+  };
+}
+
+function createDebug(): SessionDebugSnapshot {
+  return {
+    sessionId: "s1",
+    rounds: [
+      {
+        eventKey: "e1",
+        requestId: "r1",
+        requestIndex: 0,
+        recordedAt: 1000,
+        usage: { inputTokens: 10_000, outputTokens: 2_000, cachedInputTokens: 5_000 },
+        hitRate: 0.5,
+        generationDurationMs: 4000,
+        tokensPerSecond: 500,
+      },
+    ],
+    networkEntries: [],
+    cache: null,
   };
 }
 
@@ -93,10 +131,35 @@ function createUsage(overrides: Partial<SessionUsageState> = {}): SessionUsageSt
   };
 }
 
-function createServices(getAppUsageSnapshot = vi.fn(async () => createSnapshot(1_234_567))) {
-  return {
+function createServices(options?: { failAll?: boolean }) {
+  const getAppUsageSnapshot = vi.fn(async () => {
+    if (options?.failAll) throw new Error("no_active_workspace");
+    return createSnapshot(1_234_567);
+  });
+  const readSessionDebug = vi.fn(async () => {
+    if (options?.failAll) throw new Error("debug failed");
+    return createDebug();
+  });
+  const getTaskTokenUsage = vi.fn(async () => {
+    if (options?.failAll) throw new Error("totals failed");
+    return {
+      sessionId: "s1",
+      totalTokens: 130_000,
+      inputTokens: 120_000,
+      outputTokens: 8_000,
+      reasoningTokens: 0,
+      cacheCreationTokens: 2_000,
+      cacheReadTokens: 30_000,
+      modelRequestCount: 12,
+      modelErrorCount: 0,
+      inputBaselineBySource: {},
+    };
+  });
+  const services = {
     usageStatsService: { getAppUsageSnapshot },
+    zcodeAgentService: { readSessionDebug, getTaskTokenUsage },
   } as unknown as IServiceAccessor;
+  return { services, getAppUsageSnapshot, readSessionDebug, getTaskTokenUsage };
 }
 
 function renderBar(props: {
@@ -108,7 +171,7 @@ function renderBar(props: {
   return render(
     createElement(
       ServiceProvider,
-      { services: props.services ?? createServices() },
+      { services: props.services ?? createServices().services },
       createElement(
         ZCodeIntlProvider,
         { initialLocale: "zh-CN" },
@@ -116,6 +179,8 @@ function renderBar(props: {
           usage: props.usage,
           phase: props.phase ?? null,
           enabled: props.enabled,
+          workspacePath: "/workspace",
+          sessionId: "s1",
         }),
       ),
     ),
@@ -124,54 +189,70 @@ function renderBar(props: {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.clearAllMocks();
 });
 
+function barMetrics(bar: HTMLElement): string {
+  // 设置面板与状态条共用同一个 data-testid 容器；断言指标时必须排除面板文案，
+  // 否则「工具调用」「今日合计」这些面板标签会造成误判。
+  const panel = bar.querySelector('[data-testid="usage-settings-panel"]');
+  const clone = bar.cloneNode(true) as HTMLElement;
+  const clonePanel = clone.querySelector('[data-testid="usage-settings-panel"]');
+  if (panel && clonePanel) {
+    clonePanel.remove();
+  }
+  return clone.textContent ?? "";
+}
+
 describe("ComposerUsageStatusBar", () => {
-  it("展示今日、上下文与本会话四项指标", async () => {
+  it("展示上下文、速度、本轮、会话、今日五项默认指标", async () => {
     renderBar({ usage: createUsage() });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
-    // 今日 token 数来自 7 日快照里的当日格子；zh-CN 的 compact 用「万」而非 M。
-    await waitFor(() => expect(bar.textContent).toContain("今日"));
-    expect(bar.textContent).toContain("123.5万");
-    // 上下文占用 50000/200000 = 25%。
-    expect(bar.textContent).toContain("25%");
-    // 本会话累计取 outputTokens（8000 不足 1 万，按普通数字展示）。
-    expect(bar.textContent).toContain("8000");
-    // 没有跑过轮次时速率位显示占位符而不是 0。
-    expect(bar.textContent).toContain("—");
+    await waitFor(() => expect(barMetrics(bar)).toContain("今日"));
+
+    const metrics = barMetrics(bar);
+    // 上下文 50000/200000 = 25%
+    expect(metrics).toContain("25%");
+    // 速度来自逐轮事实 500 tok/s
+    expect(metrics).toContain("500");
+    // 本轮输出 2000
+    expect(metrics).toContain("2000");
+    // 今日 123.5万
+    expect(metrics).toContain("123.5万");
+    // 工具调用默认关闭
+    expect(metrics).not.toContain("工具");
   });
 
-  it("enabled=false 时不渲染，也不发起用量查询", async () => {
-    const getAppUsageSnapshot = vi.fn(async () => createSnapshot(1));
+  it("enabled=false 时不渲染，也不发起任何查询", async () => {
+    const { services, getAppUsageSnapshot, readSessionDebug, getTaskTokenUsage } =
+      createServices();
     const { container } = renderBar({
       usage: createUsage(),
       enabled: false,
-      services: createServices(getAppUsageSnapshot),
+      services,
     });
 
-    expect(container.querySelector(`[data-testid="${TID_V4_COMPOSER_USAGE_STATUS_BAR}"]`)).toBeNull();
+    expect(
+      container.querySelector(`[data-testid="${TID_V4_COMPOSER_USAGE_STATUS_BAR}"]`),
+    ).toBeNull();
     expect(getAppUsageSnapshot).not.toHaveBeenCalled();
+    expect(readSessionDebug).not.toHaveBeenCalled();
+    expect(getTaskTokenUsage).not.toHaveBeenCalled();
   });
 
-  it("没有会话数据时四项指标全部回退为占位符，不显示 0", async () => {
-    const services = createServices(vi.fn(async () => createSnapshot(0)));
-    renderBar({ usage: null, services });
+  it("会话累计优先用任务用量的请求次数", async () => {
+    renderBar({ usage: createUsage() });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
     await waitFor(() => expect(bar.textContent).toContain("今日"));
-    expect(bar.textContent).toContain("0");
-    // 上下文与本会话无数据 → 占位符。
-    expect(bar.textContent?.match(/—/g)?.length).toBeGreaterThanOrEqual(2);
+    // 会话项展示 outputTokens
+    expect(bar.textContent).toContain("8000");
   });
 
-  it("用量查询失败时不崩，仍渲染状态条", async () => {
-    const services = createServices(
-      vi.fn(async () => {
-        throw new Error("no_active_workspace");
-      }),
-    );
+  it("所有查询都失败时仍渲染状态条，不崩", async () => {
+    const { services } = createServices({ failAll: true });
     renderBar({ usage: createUsage(), services });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
@@ -179,11 +260,41 @@ describe("ComposerUsageStatusBar", () => {
     expect(bar.textContent).toContain("25%");
   });
 
-  it("详情入口带可访问名称", async () => {
+  it("没有会话数据时回退为占位符", async () => {
+    const { services } = createServices({ failAll: true });
+    renderBar({ usage: null, services });
+
+    const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
+    await waitFor(() => expect(bar.textContent).toContain("上下文"));
+    expect(bar.textContent?.match(/—/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("设置面板包含全部六项开关与上下文窗口覆盖", async () => {
+    renderBar({ usage: createUsage() });
+
+    const panel = await screen.findByTestId("usage-settings-panel");
+    expect(panel.textContent).toContain("上下文");
+    expect(panel.textContent).toContain("生成速度");
+    expect(panel.textContent).toContain("本轮用量");
+    expect(panel.textContent).toContain("会话累计");
+    expect(panel.textContent).toContain("工具调用");
+    expect(panel.textContent).toContain("今日合计");
+    expect(panel.textContent).toContain("中文单位");
+    // 六个显示项 + 中文单位 = 7 个 checkbox
+    expect(panel.querySelectorAll('input[type="checkbox"]').length).toBe(7);
+  });
+
+  it("从本地设置读回已关闭的显示项", async () => {
+    window.localStorage.setItem(
+      "zcode.composerUsageBar.settings.v1",
+      JSON.stringify({ items: { today: false, speed: false } }),
+    );
     renderBar({ usage: createUsage() });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
-    const button = bar.querySelector("button");
-    expect(button?.getAttribute("aria-label")).toBe("用量明细");
+    await waitFor(() => expect(barMetrics(bar)).toContain("上下文"));
+    const metrics = barMetrics(bar);
+    expect(metrics).not.toContain("今日");
+    expect(metrics).not.toContain("速度");
   });
 });

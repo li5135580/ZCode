@@ -2681,7 +2681,14 @@ function ConversationComposerImpl({
           也不放进 leadingActions，否则会被输入框的 flex 布局压缩。
           草稿态（centered）不显示：此时还没有会话，速率/上下文/累计全是空值，
           居中布局的视觉焦点应保持在输入框上；发出第一条消息后自然出现。 */}
-      <ComposerUsageStatusBar usage={composerUsage} phase={composerPhase} enabled={!centered} />
+      <ComposerUsageStatusBar
+        usage={composerUsage}
+        phase={composerPhase}
+        enabled={!centered}
+        workspacePath={workspacePath}
+        workspaceIdentity={workspaceIdentity}
+        sessionId={sessionId}
+      />
       <ImagePreviewDialog
         initialIndex={attachmentPreviewIndex}
         items={composerMediaPreviewItems}

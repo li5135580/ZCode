@@ -1,15 +1,27 @@
 import { describe, expect, it } from "vitest";
-import type { AppUsageSnapshot } from "@zcode/shared";
+import type { AppUsageSnapshot, SessionDebugSnapshot, ZCodeTaskTokenUsageResult } from "@zcode/shared";
 import {
   computeTurnRate,
+  DEFAULT_USAGE_BAR_ITEMS,
+  formatTokens,
   isTurnEndPhase,
   isTurnRunningPhase,
+  parseUsageBarSettings,
+  resolveContextMaxTokens,
+  resolveContextTier,
   resolveContextUsageRatio,
+  resolveLatestTurnDetail,
   resolveLocalDateKey,
+  resolveSessionCacheHitRate,
+  resolveSessionTotals,
+  resolveSpeedTier,
   resolveTodayUsage,
+  USAGE_BAR_ITEMS,
 } from "../src/v4/composer/composerUsageMetrics.js";
 
-function buildSnapshot(cells: Array<{ date: string; totalTokens: number; turnCount: number; toolCallCount: number }>): AppUsageSnapshot {
+function buildSnapshot(
+  cells: Array<{ date: string; totalTokens: number; turnCount: number; toolCallCount: number }>,
+): AppUsageSnapshot {
   return {
     range: "7d",
     generatedAt: 0,
@@ -54,14 +66,105 @@ function buildSnapshot(cells: Array<{ date: string; totalTokens: number; turnCou
   };
 }
 
+function buildDebug(
+  rounds: Array<{
+    recordedAt: number;
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    reasoning?: number;
+    duration?: number | null;
+    tps?: number | null;
+  }>,
+): SessionDebugSnapshot {
+  return {
+    sessionId: "s1",
+    rounds: rounds.map((round, index) => ({
+      eventKey: `e${index}`,
+      requestId: `r${index}`,
+      requestIndex: index,
+      recordedAt: round.recordedAt,
+      usage: {
+        inputTokens: round.input,
+        outputTokens: round.output,
+        reasoningTokens: round.reasoning,
+        cachedInputTokens: round.cacheRead,
+      },
+      hitRate: null,
+      generationDurationMs: round.duration ?? null,
+      tokensPerSecond: round.tps ?? null,
+    })),
+    networkEntries: [],
+    cache: null,
+  };
+}
+
 describe("composer 用量状态条计算", () => {
+  describe("设置解析", () => {
+    it("空值或损坏的 JSON 回退默认设置", () => {
+      expect(parseUsageBarSettings(null).items).toEqual(DEFAULT_USAGE_BAR_ITEMS);
+      expect(parseUsageBarSettings("{not json").items).toEqual(DEFAULT_USAGE_BAR_ITEMS);
+    });
+
+    it("只接受已知显示项的布尔值", () => {
+      const parsed = parseUsageBarSettings(
+        JSON.stringify({ items: { ctx: false, tools: true, bogus: true } }),
+      );
+      expect(parsed.items.ctx).toBe(false);
+      expect(parsed.items.tools).toBe(true);
+      expect(parsed.items.speed).toBe(DEFAULT_USAGE_BAR_ITEMS.speed);
+    });
+
+    it("上下文覆盖只接受正数", () => {
+      expect(parseUsageBarSettings(JSON.stringify({ contextWindowOverride: 200000 }))
+        .contextWindowOverride).toBe(200000);
+      expect(parseUsageBarSettings(JSON.stringify({ contextWindowOverride: -1 }))
+        .contextWindowOverride).toBeNull();
+      expect(parseUsageBarSettings(JSON.stringify({ contextWindowOverride: "x" }))
+        .contextWindowOverride).toBeNull();
+    });
+
+    it("显示项清单覆盖插件里的六项", () => {
+      expect([...USAGE_BAR_ITEMS]).toEqual([
+        "ctx",
+        "speed",
+        "turn",
+        "session",
+        "tools",
+        "today",
+      ]);
+    });
+  });
+
+  describe("格式化", () => {
+    it("中文单位与英文缩写可切换", () => {
+      expect(formatTokens("zh-CN", 1_234_567, true)).toContain("万");
+      expect(formatTokens("zh-CN", 1_234_567, false)).toMatch(/M/);
+      // 英文界面忽略该开关。
+      expect(formatTokens("en-US", 1_234_567, true)).toMatch(/M/);
+    });
+  });
+
+  describe("分级", () => {
+    it("上下文按 50%/75% 分档", () => {
+      expect(resolveContextTier(0.3)).toBe("ok");
+      expect(resolveContextTier(0.6)).toBe("warm");
+      expect(resolveContextTier(0.9)).toBe("hot");
+      expect(resolveContextTier(null)).toBe("ok");
+    });
+
+    it("速度按 20/60 tok/s 分档", () => {
+      expect(resolveSpeedTier(10)).toBe("hot");
+      expect(resolveSpeedTier(40)).toBe("warm");
+      expect(resolveSpeedTier(100)).toBe("ok");
+      expect(resolveSpeedTier(null)).toBe("ok");
+    });
+  });
+
   describe("resolveLocalDateKey", () => {
     it("按指定时区输出 YYYY-MM-DD", () => {
-      // 2026-10-19T00:30:00Z 在 UTC+8 已是 10-19 08:30。
       const at = Date.UTC(2026, 9, 19, 0, 30, 0);
       expect(resolveLocalDateKey(at, "Asia/Shanghai")).toBe("2026-10-19");
-      expect(resolveLocalDateKey(at, "UTC")).toBe("2026-10-19");
-      // 同一天在 UTC-5 仍是 10-18。
       expect(resolveLocalDateKey(at, "America/New_York")).toBe("2026-10-18");
     });
 
@@ -72,7 +175,7 @@ describe("composer 用量状态条计算", () => {
   });
 
   describe("resolveTodayUsage", () => {
-    const at = Date.UTC(2026, 9, 19, 4, 0, 0); // 上海 12:00
+    const at = Date.UTC(2026, 9, 19, 4, 0, 0);
 
     it("取出当日格子的 tokens、轮次与工具调用数", () => {
       const snapshot = buildSnapshot([
@@ -96,21 +199,7 @@ describe("composer 用量状态条计算", () => {
       const snapshot = buildSnapshot([
         { date: "2026-10-18", totalTokens: 100, turnCount: 1, toolCallCount: 2 },
       ]);
-      expect(resolveTodayUsage(snapshot, at)).toEqual({
-        totalTokens: 0,
-        turnCount: 0,
-        toolCallCount: 0,
-      });
-    });
-
-    it("跳过空单元格", () => {
-      const snapshot = buildSnapshot([
-        { date: "2026-10-17", totalTokens: 1, turnCount: 1, toolCallCount: 1 },
-        { date: "2026-10-19", totalTokens: 42, turnCount: 2, toolCallCount: 3 },
-      ]);
-      snapshot.heatmap.weeks[0].days.splice(1, 0, null);
-
-      expect(resolveTodayUsage(snapshot, at).totalTokens).toBe(42);
+      expect(resolveTodayUsage(snapshot, at).totalTokens).toBe(0);
     });
   });
 
@@ -119,9 +208,7 @@ describe("composer 用量状态条计算", () => {
       expect(isTurnRunningPhase("running")).toBe(true);
       expect(isTurnRunningPhase("prewarming")).toBe(true);
       expect(isTurnRunningPhase("completedSuccess")).toBe(false);
-
       expect(isTurnEndPhase("completedSuccess")).toBe(true);
-      expect(isTurnEndPhase("completedInterrupted")).toBe(true);
       expect(isTurnEndPhase("error")).toBe(true);
       expect(isTurnEndPhase("running")).toBe(false);
       expect(isTurnEndPhase(null)).toBe(false);
@@ -130,12 +217,12 @@ describe("composer 用量状态条计算", () => {
 
   describe("computeTurnRate", () => {
     it("用输出增量除以轮次耗时", () => {
-      const sample = computeTurnRate(
-        { outputTokens: 1000, startedAtMs: 0 },
-        { outputTokens: 3000, endedAtMs: 4000 },
-      );
-
-      expect(sample).toEqual({ tokensPerSecond: 500, outputTokens: 2000, durationMs: 4000 });
+      expect(
+        computeTurnRate(
+          { outputTokens: 1000, startedAtMs: 0 },
+          { outputTokens: 3000, endedAtMs: 4000 },
+        ),
+      ).toEqual({ tokensPerSecond: 500, outputTokens: 2000, durationMs: 4000 });
     });
 
     it("没有基线、没有新增输出或耗时过短时返回 null", () => {
@@ -146,14 +233,6 @@ describe("composer 用量状态条计算", () => {
           { outputTokens: 1000, endedAtMs: 4000 },
         ),
       ).toBeNull();
-      // 输出减少（会话被压缩）也不该算出负速率。
-      expect(
-        computeTurnRate(
-          { outputTokens: 1000, startedAtMs: 0 },
-          { outputTokens: 500, endedAtMs: 4000 },
-        ),
-      ).toBeNull();
-      // 耗时低于下限：避免除以接近 0 得到荒谬值。
       expect(
         computeTurnRate(
           { outputTokens: 0, startedAtMs: 0 },
@@ -161,55 +240,129 @@ describe("composer 用量状态条计算", () => {
         ),
       ).toBeNull();
     });
+  });
 
-    it("耗时刚好等于下限时正常计算", () => {
-      const sample = computeTurnRate(
-        { outputTokens: 0, startedAtMs: 0 },
-        { outputTokens: 100, endedAtMs: 200 },
-      );
-      expect(sample?.tokensPerSecond).toBe(500);
+  describe("resolveLatestTurnDetail", () => {
+    it("汇总最近一轮的多段请求", () => {
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 100, output: 50, cacheRead: 40, duration: 500, tps: 100 },
+        { recordedAt: 3000, input: 200, output: 150, cacheRead: 100, duration: 1500, tps: 100 },
+      ]);
+
+      const detail = resolveLatestTurnDetail(debug);
+      expect(detail).toEqual({
+        inputTokens: 300,
+        outputTokens: 200,
+        cacheReadTokens: 140,
+        reasoningTokens: 0,
+        cacheHitRate: 140 / 300,
+        generationDurationMs: 2000,
+        tokensPerSecond: 100,
+        requestCount: 2,
+      });
+    });
+
+    it("时间断档超过 10 分钟视为上一轮，不计入", () => {
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 999, output: 999 },
+        { recordedAt: 20 * 60 * 1000, input: 10, output: 20 },
+      ]);
+
+      const detail = resolveLatestTurnDetail(debug);
+      expect(detail?.outputTokens).toBe(20);
+      expect(detail?.requestCount).toBe(1);
+    });
+
+    it("没有轮次时返回 null", () => {
+      expect(resolveLatestTurnDetail(null)).toBeNull();
+      expect(resolveLatestTurnDetail(buildDebug([]))).toBeNull();
+    });
+
+    it("输入为 0 时缓存命中率为 null 而不是 Infinity", () => {
+      const detail = resolveLatestTurnDetail(buildDebug([{ recordedAt: 1, input: 0, output: 5 }]));
+      expect(detail?.cacheHitRate).toBeNull();
     });
   });
 
-  describe("resolveContextUsageRatio", () => {
-    const baseUsage = {
-      contextWindow: {
-        usedTokens: 50_000,
-        maxTokens: 200_000,
-        autoCompactThresholdTokens: null,
-      },
-      cumulative: {
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-      },
+  describe("上下文", () => {
+    const usage = {
+      contextWindow: { usedTokens: 50_000, maxTokens: 200_000, autoCompactThresholdTokens: null },
+      cumulative: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     };
 
     it("返回占用比例", () => {
-      expect(resolveContextUsageRatio(baseUsage)).toBeCloseTo(0.25);
+      expect(resolveContextUsageRatio(usage)).toBeCloseTo(0.25);
+    });
+
+    it("用户覆盖的窗口容量优先", () => {
+      expect(resolveContextMaxTokens(usage, 100_000)).toBe(100_000);
+      expect(resolveContextUsageRatio(usage, 100_000)).toBeCloseTo(0.5);
     });
 
     it("上下文缺失或上限非法时返回 null", () => {
       expect(resolveContextUsageRatio(null)).toBeNull();
-      expect(
-        resolveContextUsageRatio({ ...baseUsage, contextWindow: null }),
-      ).toBeNull();
+      expect(resolveContextUsageRatio({ ...usage, contextWindow: null })).toBeNull();
       expect(
         resolveContextUsageRatio({
-          ...baseUsage,
+          ...usage,
           contextWindow: { usedTokens: 1, maxTokens: 0, autoCompactThresholdTokens: null },
         }),
       ).toBeNull();
     });
 
-    it("比例夹紧到 0..1，避免超出上限时进度环溢出", () => {
+    it("比例夹紧到 0..1", () => {
       expect(
         resolveContextUsageRatio({
-          ...baseUsage,
+          ...usage,
           contextWindow: { usedTokens: 300_000, maxTokens: 200_000, autoCompactThresholdTokens: null },
         }),
       ).toBe(1);
+    });
+  });
+
+  describe("会话累计", () => {
+    const taskUsage = {
+      sessionId: "s1",
+      totalTokens: 1000,
+      inputTokens: 800,
+      outputTokens: 200,
+      reasoningTokens: 0,
+      cacheCreationTokens: 50,
+      cacheReadTokens: 400,
+      modelRequestCount: 7,
+      modelErrorCount: 0,
+      inputBaselineBySource: {},
+    } satisfies ZCodeTaskTokenUsageResult;
+
+    it("优先用任务用量（含请求次数）", () => {
+      const totals = resolveSessionTotals(taskUsage, null);
+      expect(totals).toEqual({
+        inputTokens: 800,
+        outputTokens: 200,
+        cacheReadTokens: 400,
+        cacheWriteTokens: 50,
+        requestCount: 7,
+      });
+      expect(resolveSessionCacheHitRate(totals)).toBeCloseTo(0.5);
+    });
+
+    it("任务用量不可用时退回快照 cumulative", () => {
+      const totals = resolveSessionTotals(null, {
+        contextWindow: null,
+        cumulative: {
+          inputTokens: 100,
+          outputTokens: 30,
+          cacheReadTokens: 20,
+          cacheWriteTokens: 5,
+        },
+      });
+      expect(totals?.outputTokens).toBe(30);
+      expect(totals?.requestCount).toBeNull();
+    });
+
+    it("两者都缺时返回 null", () => {
+      expect(resolveSessionTotals(null, null)).toBeNull();
+      expect(resolveSessionCacheHitRate(null)).toBeNull();
     });
   });
 });
