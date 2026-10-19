@@ -171,6 +171,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
         return port.start(executionRequest, {
           signal: launchOptions?.signal,
           ...(launchOptions?.model ? { model: launchOptions.model } : {}),
+          ...(launchOptions?.modelOverride ? { modelOverride: launchOptions.modelOverride } : {}),
         });
       }
       return port.run(executionRequest, launchOptions);
@@ -207,7 +208,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
         lifecycle.agentId,
         runOptions?.signal,
       );
-      const hasForegroundModelOverride = runOptions?.modelOverride !== undefined;
+      const hasForegroundModelOverride = runOptions?.modelOverride?.background === "deny";
       if (hasForegroundModelOverride) {
         borrowedForegroundAgentIds.add(lifecycle.agentId);
       }
@@ -479,6 +480,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
         {
           signal: taskAbort.signal,
           ...(startOptions?.model ? { model: startOptions.model } : {}),
+          ...(startOptions?.modelOverride ? { modelOverride: startOptions.modelOverride } : {}),
         },
         {
           onSessionReady: async () => {
@@ -932,6 +934,7 @@ async function sendMessageToLocalAgent(
     task,
     request,
     message,
+    sendOptions,
   );
 }
 
@@ -962,6 +965,7 @@ async function resumeTerminalAgentInBackground(
   task: RuntimeTaskSnapshot,
   request: SubagentSendMessageRequest,
   message: RuntimeTaskPendingMessage,
+  sendOptions?: SubagentSendMessageOptions,
 ): Promise<SubagentSendMessageResult> {
   const profile = profiles.find((candidate) => candidate.name === task.agentType);
   if (!profile) {
@@ -1019,7 +1023,11 @@ async function resumeTerminalAgentInBackground(
     resumeRequest,
     lifecycle,
     registry,
-    { signal: taskAbort.signal },
+    {
+      signal: taskAbort.signal,
+      model: sendOptions?.model,
+      modelOverride: sendOptions?.modelOverride,
+    },
     {
       resumeFromStore: true,
       onSessionReady: async () => {
@@ -2097,8 +2105,17 @@ function aggregateModelUsage(events: SessionEvent[]): ModelUsage | undefined {
   let usage: ModelUsage | undefined;
 
   for (const event of events) {
-    if (event.type !== SessionEventType.ModelComplete) continue;
     const payload = event.payload;
+    // 与主 turn 共用失败事件的用量事实，不增加独立汇总状态。
+    if (
+      event.type !== SessionEventType.ModelComplete &&
+      !(
+        event.type === SessionEventType.ModelNetworkStatus &&
+        isRecord(payload) &&
+        payload.type === "model_request_failed"
+      )
+    )
+      continue;
     if (!isRecord(payload) || !isRecord(payload.usage)) {
       continue;
     }

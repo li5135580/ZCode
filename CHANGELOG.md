@@ -2,6 +2,51 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
+## [二开 fork.7] - 2026-10-19
+
+> 构建标签 `v3.16.1-fork.7`，安装包版本 `3.16.2-fork.7`。
+> 仓库 `package.json` 版本与上游保持一致（`3.16.1`）。
+
+### 对齐上游 v3.16.1
+
+上游从 `aac47556`（v3.15.1）推进到 `0a1fc56d`（v3.16.1），4502 个文件变更。
+二开增强功能全部保留，并按上游的新结构做了适配：
+
+- **子智能体多模型链**：`SubagentsSection` / `SubagentModelChainEditor` 与上游的
+  `draftScopeKey` 等新字段合并，模型链行为不变。
+- **对话多处批注**：`ConversationComposer` 合并上游新增的 `draftScopeKey` 参数，
+  `useConversationSelectionReferences` 同时保留上游的草稿作用域与本地的
+  `updateReferenceComment` 能力。
+- **模型自动获取**：`test-ids` 在上游从主 barrel 移到了子路径导出
+  （`@zcode/shared/test-ids`），`FetchModelsButton` 的导入同步调整。
+- **手动检查更新**：`shouldShowDesktopUpdateEntry` 仍按构建期 `ZCODE_AUTO_UPDATE` 判定，
+  对应测试的 mock 从产品身份改为构建期开关。
+
+### 内置模型规则：以上游为基底
+
+上游把规则正则统一简化成 `.*xxx.*` 并重排了兜底规则，多数变体（`-preview`、`flashx`、
+`gpt-5.4-preview`）因此被上游自己修好了。本次合并改为**以上游规则表为基底**，
+只在其末尾追加二开独有的 5 条覆盖规则（解析是数组顺序 overlay，后写覆盖先写）：
+
+| 规则 | 作用 |
+| --- | --- |
+| `.*gpt-5[.-]6...` | 连字符写法 `gpt-5-6` / `gpt-5-6-sol` |
+| `.*claude-(?:4\|3\.5)...` | `claude-4-*` / `claude-3.5-*` |
+| `.*grok-4[.-]7.*` | `grok-4.7` / `grok-4-7` |
+| `.*qwen3-vl-(?:plus\|flash).*` | 上游只有 `plus`，补上 `flash` |
+| `.*\[1m\]` | 显式声明 1M 上下文（上游已移除该规则） |
+
+`revision` 33 → 34。上游新增的 `mimo-v2.6`、`kimi-k3`、`deepseek-v4` 等模型事实全部继承；
+兜底规则采用上游的新值（1M 上下文 / 128K 输出）。
+
+> 已知边界：官方若下发 `revision > 34` 的内置配置，会覆盖本次补充的规则。
+
+### 兼容性修复
+
+- 上游新增 `architecture:check` 的 `missing-module-artifact` 规则要求
+  `packages/services/src/gen-ui/contract.test.ts`，而该文件上游自身也没有提供。
+  这是上游遗留问题（`architecture-policy.yaml` 在 v3.15.1 就已引入），不影响构建。
+
 ## [二开 fork.6] - 2026-10-18
 
 > 构建标签 `v3.15.1-fork.6`，安装包版本 `3.15.2-fork.6`。

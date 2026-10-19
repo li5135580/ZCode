@@ -12,7 +12,7 @@ import {
   TID_MODEL_PROVIDER_FETCH_MODELS_DIALOG,
   TID_MODEL_PROVIDER_FETCH_MODELS_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { Checkbox } from "@/components/ui/checkbox.js";
 import {

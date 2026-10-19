@@ -7,7 +7,8 @@ import { getUpdateMenuLabelId, getUpdateMenuLabelValues } from "@/lib/desktopUpd
 
 vi.mock("@zcode/shared", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@zcode/shared")>()),
-  ZCODE_PRODUCT_FLAVOR: "production",
+  // 更新入口跟随构建期自动更新能力，不再看产品身份；测试里模拟"构建已开启自动更新"。
+  ZCODE_AUTO_UPDATE_ENABLED: true,
 }));
 
 const mocks = vi.hoisted(() => ({

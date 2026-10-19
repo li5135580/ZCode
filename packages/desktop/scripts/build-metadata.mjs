@@ -126,6 +126,9 @@ export function collectBuildMetadata() {
   return {
     // 根 package.json 的 version 必须与上游对齐，fork 版本只在构建期通过环境变量注入。
     appVersion: resolveAppVersion(rootPackageJson.version),
+    minCompatibleVersion: normalizeVersion(
+      rootPackageJson.zcodeCompatibility?.minCompatibleVersion ?? rootPackageJson.version,
+    ),
     buildCommitId: resolveCommitId(),
     buildTime: new Date().toISOString(),
     electronBuilderVersion: resolveInstalledPackageVersion(
@@ -141,7 +144,14 @@ export function readBuildMetadata() {
   }
 
   try {
-    return readJson(metadataPath);
+    const metadata = readJson(metadataPath);
+    return {
+      ...metadata,
+      minCompatibleVersion:
+        typeof metadata.minCompatibleVersion === "string" && metadata.minCompatibleVersion.length > 0
+          ? normalizeVersion(metadata.minCompatibleVersion)
+          : normalizeVersion(metadata.appVersion),
+    };
   } catch {
     return null;
   }

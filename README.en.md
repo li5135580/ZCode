@@ -165,6 +165,11 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 
 ## Updates
 
+- 2026-10-19: Synced to upstream v3.16.1 (subagent session management, tool search, and other
+  upstream updates); all fork enhancements preserved. The repository version now matches
+  upstream.
+- 2026-10-18 (fork.6): Added macOS (arm64) and Linux (AppImage + deb) clients; the update
+  manifest is now selected per platform.
 - 2026-10-17 (fork.3): Model chain layout (primary comes from the Model field, fallbacks only,
   drag to reorder, no fixed 2-model limit); model capability metadata parsing plus host rule
   fixes for variant names; manual update check restored with `latest.yml` publishing;
@@ -260,6 +265,8 @@ When starting the general Web service's HTTP entry directly, configure API/WebSo
 See Packaging below for build instructions. `pnpm build:zcode` only creates the distribution; it does not replace an existing `zcode` on `PATH`. If the command still points to an older installation or another checkout, check it with `command -v zcode` on macOS / Linux or `where.exe zcode` on Windows.
 
 ### CLI Source Development
+
+See the [CLI usage guide (Chinese)](apps/zcode-cli/docs/usage/README.md) for model configuration, non-interactive runs, tools and extensions, batch evaluation, and trajectory capture.
 
 Use the source entry when developing the TUI or Agent:
 
