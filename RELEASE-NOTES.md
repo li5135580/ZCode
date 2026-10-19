@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.1-fork.11`）
+# ZCode 二开增强版（构建标签 `v3.16.1-fork.12`）
 
 ## 📦 发布内容
 
@@ -7,17 +7,17 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.2-fork.11-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.2-fork.11-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.2-fork.11-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.2-fork.11-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.2-fork.11-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.2-fork.11-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.2-fork.12-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.2-fork.12-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.2-fork.12-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.2-fork.12-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.2-fork.12-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.2-fork.12-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.2-fork.11` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.2-fork.12` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.1`，
-> 但按 semver `3.16.2-fork.11 > 3.16.1`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.2-fork.12 > 3.16.1`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
@@ -37,15 +37,20 @@
 
 对话输入框下方常驻一行轻量指标，无需打开设置页即可看到消耗：
 
-| 指标 | 含义 |
-| --- | --- |
-| 今日 | 当天全应用 token 合计（本地用量库按日聚合） |
-| 本轮 | 当前这一轮的输出速度 tok/s |
-| 上下文 | 上下文占用百分比 |
-| 本会话 | 本会话累计输出 tokens |
+| 指标 | 含义 | 默认 |
+| --- | --- | --- |
+| 上下文 | 进度条 + 百分比，按 50%/75% 分三档色 | 开 |
+| 生成速度 | 最近一次完成请求的 tok/s，按快慢着色 | 开 |
+| 本轮 | 本轮输出 tokens，悬停看输入/输出/缓存命中/耗时/段数 | 开 |
+| 会话累计 | 本会话累计输出，悬停看输入/输出/缓存命中/请求次数 | 开 |
+| 工具调用 | 今日工具调用次数 | 关 |
+| 今日合计 | 当天全应用 token 合计 | 开 |
+| 子智能体 | 运行中数量 + 状态点（阻塞转黄、运行转绿） | 开 |
 
-点右侧「明细」可看今日 tokens/轮次/工具调用、会话累计的输入输出与缓存读写、上下文具体用量。
-数据只读本地数据库，不上传；今日合计在每轮结束时刷新一次，运行中不轮询。
+点右侧 ⚙ 可逐项开关、指定上下文窗口容量（留空跟随模型配置）、切换中文万/亿单位。
+数据只读本地数据库，不上传；每轮结束时刷新一次，运行中不轮询。
+
+会话因上下文超限被拒时，状态条会直接标红提示，并建议压缩或新开会话。
 
 > 产物文件名本版起改为不含空格的 `ZCode-Preview-*`。此前 `ZCode.Preview-*` 的写法会让
 > GitHub 资产名被替换成点号，并触发发布动作的资产 label 恢复逻辑，导致 Release 卡在草稿态。
