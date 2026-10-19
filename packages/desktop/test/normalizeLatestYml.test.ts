@@ -158,5 +158,15 @@ releaseDate: '2026-10-18T00:00:00.000Z'
 
       expect(parsed.releaseNotes).toBe(multiLine);
     });
+
+    it("CRLF 输入被统一成 LF，保证三平台清单逐字节一致", () => {
+      // Windows runner checkout 会得到 CRLF；若不归一，Windows 清单会带上 \r。
+      const crlf = "# 标题\r\n\r\n- 第一项\r\n- 第二项\r\n";
+      const parsed = parse(rewriteLatestYml(SAMPLE, { releaseNotes: crlf }).content);
+
+      // 末尾空行会被 trim 掉，正文换行保持。
+      expect(parsed.releaseNotes).toBe("# 标题\n\n- 第一项\n- 第二项");
+      expect(parsed.releaseNotes).not.toMatch(/\r/);
+    });
   });
 });

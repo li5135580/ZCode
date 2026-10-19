@@ -76,7 +76,9 @@ export function rewriteLatestYml(content, options = {}) {
 
   // electron-builder 不会把更新说明写进清单，导致客户端「发现新版本」弹窗只有
   // 版本号、没有内容。这里注入仓库维护的 RELEASE-NOTES.md，与 Release 正文同源。
-  const releaseNotes = options.releaseNotes?.trim();
+  // 换行统一成 LF：Windows runner checkout 得到 CRLF、mac/Linux 得到 LF，
+  // 不归一会让同一版本的三份清单逐字节不一致。
+  const releaseNotes = options.releaseNotes?.replace(/\r\n?/g, "\n").trim();
   if (releaseNotes) {
     parsed.releaseNotes = releaseNotes;
   }
