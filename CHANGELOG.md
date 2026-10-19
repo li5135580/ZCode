@@ -49,6 +49,12 @@ x64 仍跳过签名（Intel 无此硬性约束）。
   （macOS 自带 `prebuilds/darwin-*`，Linux 来自 `@lydell/node-pty-linux-*`）则降级继续，
   避免 CI runner 缺编译链时 `pnpm install` 整体中断。
 
+### 发版策略：只保留最近两个 Release
+
+Release 创建后自动清理更早的条目（`gh release delete`），只保留最近两个。
+`releases/latest/download/*` 始终指向最新版，旧条目没有实际用途，只占仓库空间。
+**tag 不删**，保留可回溯的构建点。
+
 ## [二开 fork.5] - 2026-10-17
 
 > 构建标签 `v3.15.1-fork.5`，安装包版本 `3.15.2-fork.5`。

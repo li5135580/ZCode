@@ -220,3 +220,37 @@ jobs:
             # 配置生成，客户端默认从 releases/latest/download/latest.yml 读取。
             artifacts/**/*.yml
             artifacts/**/*.blockmap
+
+      - name: Prune old releases
+        # 只保留最近两个 Release。electron-updater 读的是 releases/latest/download，
+        # 旧 Release 只占仓库空间、干扰人工回滚判断，留着没有实际作用。
+        # tag 不删：保留可回溯的构建点，需要时能从同一 commit 重新发版。
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          keep=2
+          current="${{ github.ref_name }}"
+          # 按发布时间倒序；当前这次构建的 tag 永远保留，避免排序异常把自己删掉。
+          mapfile -t tags < <(
+            gh release list --limit 100 --exclude-drafts \
+              --json tagName,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[].tagName'
+          )
+          echo "existing releases: ${#tags[@]} (keep=$keep, current=$current)"
+          if [ "${#tags[@]}" -eq 0 ]; then
+            echo "::error::gh release list returned nothing; refusing to continue silently"
+            exit 1
+          fi
+          if [ "${#tags[@]}" -le "$keep" ]; then
+            echo "nothing to prune"
+            exit 0
+          fi
+          for tag in "${tags[@]:$keep}"; do
+            if [ "$tag" = "$current" ]; then
+              echo "skip current release: $tag"
+              continue
+            fi
+            echo "deleting release: $tag"
+            gh release delete "$tag" --yes
+          done
