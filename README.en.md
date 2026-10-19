@@ -70,14 +70,33 @@ modelChain:
   a single message
 - **Edit before sending**: Each note can be edited or removed in the composer's quote list
 
-### 4. GitHub Actions Auto Sync & Release
+### 4. Usage Status Bar Under the Composer
+
+A lightweight row sits permanently under the chat input, so usage is visible without opening
+Settings:
+
+| Metric | Meaning | Source |
+| --- | --- | --- |
+| Today | Tokens across all sessions today | Local usage DB, aggregated per day from `model_usage` |
+| This turn | Output speed of the current turn (tok/s) | Cumulative output delta ÷ turn duration |
+| Context | Context window usage percentage | Session snapshot `usage.contextWindow` |
+| Session | Cumulative output tokens of this session | Session snapshot `usage.cumulative` |
+
+- **Details on hover**: Click "Details" to see today's tokens/turns/tool calls, session input,
+  output, cache read/write, and the exact context numbers
+- **Refresh policy**: Today's total is re-queried once per finished turn rather than polled
+  during a run; speed and context follow the live session snapshot
+- **Fully local**: Reads the local SQLite database only — nothing is uploaded or fetched
+- **Hidden while drafting**: With no session yet, the visual focus stays on the input box
+
+### 5. GitHub Actions Auto Sync & Release
 
 - **Auto Sync Upstream**: Check upstream for new commits hourly and merge them automatically
   (custom commits are preserved by git)
 - **Auto Build & Release**: Automatically build packages (Windows, macOS, Linux) and publish on push
 - **Conflict Notification**: Automatically create an Issue when merge conflicts occur
 
-### 5. Custom Update Source & Manual Check
+### 6. Custom Update Source & Manual Check
 
 - **Update Source Switch**: Client update detection source points at this repository's GitHub Releases
 - **Manual Check**: Available from the app menu, tray, and Help menu — including the Preview build

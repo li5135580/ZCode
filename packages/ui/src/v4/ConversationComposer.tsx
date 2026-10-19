@@ -180,6 +180,7 @@ import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { useConversationSelectionReferences } from "@/v4/composer/useConversationSelectionReferences.js";
 import { toConversationQuote } from "@/lib/conversationSelectionReference.js";
 import { ConversationBackgroundWorkTrigger } from "@/v4/composer/ConversationBackgroundWorkTrigger.js";
+import { ComposerUsageStatusBar } from "@/v4/composer/ComposerUsageStatusBar.js";
 import { V4ComposerCuaEntry } from "@/v4/composer/V4ComposerCuaEntry.js";
 import {
   V4ComposerModeSwitch,
@@ -2676,6 +2677,11 @@ function ConversationComposerImpl({
           </p>
         ) : null}
       </div>
+      {/* 用量状态条贴在输入卡外沿：不进入输入 surface，避免被误认为输入区的一部分；
+          也不放进 leadingActions，否则会被输入框的 flex 布局压缩。
+          草稿态（centered）不显示：此时还没有会话，速率/上下文/累计全是空值，
+          居中布局的视觉焦点应保持在输入框上；发出第一条消息后自然出现。 */}
+      <ComposerUsageStatusBar usage={composerUsage} phase={composerPhase} enabled={!centered} />
       <ImagePreviewDialog
         initialIndex={attachmentPreviewIndex}
         items={composerMediaPreviewItems}
