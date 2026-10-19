@@ -212,6 +212,20 @@ jobs:
         with:
           path: artifacts
 
+      - name: Drop duplicate debug manifests
+        # 三个平台各自产出一份 builder-debug.yml，上传到同一个 Release 时后两份与已有
+        # 资产重名，action 走资产更新路径，而 GitHub 已不接受 label 写入（404），
+        # 整个 release 任务失败、Release 停在 draft。
+        # action-gh-release 的 files 只支持 glob，`!pattern` 排除不生效，必须在这里删。
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=$(find artifacts -name 'builder-debug.yml' -type f | wc -l)
+          echo "found ${found} builder-debug.yml"
+          find artifacts -name 'builder-debug.yml' -type f -delete
+          echo "remaining:"
+          find artifacts -name '*.yml' -type f | sort
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -234,11 +248,9 @@ jobs:
             artifacts/**/*.pkg.tar.zst
             # 更新元数据与差分块文件：latest.yml 由 electron-builder 的 generic publish
             # 配置生成，客户端默认从 releases/latest/download/latest.yml 读取。
-            # 显式排除 builder-debug.yml：三个平台各产出一份同名文件，上传时后一份
-            # 与已有资产重名，触发 action 的资产更新路径并因 GitHub 不再支持 label
-            # 写入而 404，整个 Release 任务失败。它是调试产物，清单不引用。
+            # builder-debug.yml 已在下载后删除（见 Drop duplicate debug manifests 步骤），
+            # 这里的 *.yml 只会匹配到各平台的更新清单。
             artifacts/**/*.yml
-            !artifacts/**/builder-debug.yml
             artifacts/**/*.blockmap
 
       - name: Prune old releases
