@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.1-fork.8`）
+# ZCode 二开增强版（构建标签 `v3.16.1-fork.9`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,27 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.2-fork.8-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.2-fork.8-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.2-fork.8-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.2-fork.8-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.2-fork.8-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.2-fork.8-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.2-fork.9-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.2-fork.9-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.2-fork.9-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.2-fork.9-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.2-fork.9-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.2-fork.9-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.2-fork.8` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.2-fork.9` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.1`，
-> 但按 semver `3.16.2-fork.8 > 3.16.1`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.2-fork.9 > 3.16.1`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🐛 本版修复：更新弹窗没有内容
+
+此前客户端「发现新版本」弹窗只有版本号，看不到本次更新了什么。原因是 electron-builder
+生成的更新清单里没有 `releaseNotes` 字段，而弹窗只渲染清单带来的内容。
+
+现在 CI 在生成清单时注入 `RELEASE-NOTES.md`（与 Release 正文同源），三个平台都生效。
 
 ## 🆕 本版新增：输入框下方的用量状态条
 
