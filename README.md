@@ -103,10 +103,10 @@ modelChain:
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| Windows x64 | `ZCode.Preview-<版本>-win-x64.exe` | NSIS 安装包 |
-| macOS arm64 | `ZCode.Preview-<版本>-mac-arm64.dmg` | Apple Silicon；未签名，首次打开需手动放行 |
-| Linux x64 | `ZCode.Preview-<版本>-linux-x86_64.AppImage` | 免安装，`chmod +x` 后直接运行，也是自动更新的产物格式 |
-| Linux x64 | `ZCode.Preview-<版本>-linux-amd64.deb` | Debian/Ubuntu 首次安装用，自动更新仍走 AppImage |
+| Windows x64 | `ZCode-Preview-<版本>-win-x64.exe` | NSIS 安装包 |
+| macOS arm64 | `ZCode-Preview-<版本>-mac-arm64.dmg` | Apple Silicon；未签名，首次打开需手动放行 |
+| Linux x64 | `ZCode-Preview-<版本>-linux-x86_64.AppImage` | 免安装，`chmod +x` 后直接运行，也是自动更新的产物格式 |
+| Linux x64 | `ZCode-Preview-<版本>-linux-amd64.deb` | Debian/Ubuntu 首次安装用，自动更新仍走 AppImage |
 
 该安装包由本仓库的 CI 从二开源码完整构建（不是对官方包打补丁），二开功能已内置：
 

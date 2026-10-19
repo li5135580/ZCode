@@ -9,6 +9,11 @@ const PRODUCTION_IDENTITY = Object.freeze({
   flavor: "production",
   appId: "dev.zcode.app",
   productName: "ZCode",
+  // 产物文件名用的连字符形式。产品名 `ZCode Preview` 含空格，而 GitHub Release
+  // 会把资产名里的空格替换成点号；softprops/action-gh-release 因此会尝试"恢复"
+  // 资产的 label 字段，但 GitHub 已不接受该字段写入（404），导致 Release 卡在 draft。
+  // 文件名从一开始就不含空格，这条链路就不会被触发。
+  artifactProductName: "ZCode",
   linuxExecutableName: "zcode",
   linuxPackageName: "zcode",
   cuaHelperInstallVariant: null,
@@ -18,6 +23,7 @@ const PREVIEW_IDENTITY = Object.freeze({
   flavor: "preview",
   appId: "dev.zcode.app.preview",
   productName: "ZCode Preview",
+  artifactProductName: "ZCode-Preview",
   linuxExecutableName: "zcode-preview",
   linuxPackageName: "zcode-preview",
   cuaHelperInstallVariant: "preview",

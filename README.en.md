@@ -115,10 +115,10 @@ Download the package for your platform from this repository's
 
 | Platform | Artifact | Notes |
 | --- | --- | --- |
-| Windows x64 | `ZCode.Preview-<version>-win-x64.exe` | NSIS installer |
-| macOS arm64 | `ZCode.Preview-<version>-mac-arm64.dmg` | Apple Silicon; unsigned, requires manual Gatekeeper approval |
-| Linux x64 | `ZCode.Preview-<version>-linux-x86_64.AppImage` | Portable; `chmod +x` then run. Also the auto-update artifact format |
-| Linux x64 | `ZCode.Preview-<version>-linux-amd64.deb` | Debian/Ubuntu first install; auto-update still uses the AppImage |
+| Windows x64 | `ZCode-Preview-<version>-win-x64.exe` | NSIS installer |
+| macOS arm64 | `ZCode-Preview-<version>-mac-arm64.dmg` | Apple Silicon; unsigned, requires manual Gatekeeper approval |
+| Linux x64 | `ZCode-Preview-<version>-linux-x86_64.AppImage` | Portable; `chmod +x` then run. Also the auto-update artifact format |
+| Linux x64 | `ZCode-Preview-<version>-linux-amd64.deb` | Debian/Ubuntu first install; auto-update still uses the AppImage |
 
 The installer is **built from this fork's source by CI** (not a patch applied on top of the
 official package), so the enhanced features are already included:

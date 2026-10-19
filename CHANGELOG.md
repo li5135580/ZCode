@@ -2,6 +2,37 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
+## [二开 fork.8] - 2026-10-19
+
+> 构建标签 `v3.16.1-fork.8`，安装包版本 `3.16.2-fork.8`。
+
+### 新增：输入框下方的 token 用量状态条
+
+把插件式悬浮层（`zcode-token-usage-statusbar` 靠改 `app.asar` 注入）的能力做成二开原生实现。
+输入框下方常驻一行指标，显示今日合计、本轮 tok/s、上下文占用、本会话累计。
+
+- **刷新策略**：今日合计只在轮次结束时重查一次，运行中不轮询——用量是已完成请求的聚合，
+  运行中反复查询拿不到新数据，只会增加 IPC 与 SQLite 读取
+- **速率口径**：会话累计输出增量 ÷ 轮次耗时，与设置页 debug 面板一致；
+  用累计增量而非单次请求用量，是为了让子智能体、重试等旁路输出也计入
+- **今日数据**：接口只支持 all/7d/30d，没有 today；直接取 7 日快照里当日那一格，
+  不新增协议参数
+- **可选依赖**：用 `useOptionalServices` 而非 `useServices`。composer 在无 ServiceProvider
+  的宿主（单测、纯展示）里不能因为状态条而崩，缺服务时状态条自动隐藏
+- **草稿态不显示**：还没有会话时视觉焦点保持在输入框上
+
+顺带启用协议里一直未被 UI 使用的 `usage.cumulative` 字段。
+
+### 修复：Release 卡在 draft
+
+`softprops/action-gh-release` 在每次上传资产后都会尝试"恢复资产 label"，把文件名改回带空格的
+原名（`ZCode Preview-...`）。GitHub 已不再接受 label 字段写入，接口返回 404，导致资产全部
+上传成功、Release 却停在草稿态。
+
+根因是产物名含空格。改为 `ZCode-Preview-*`（新增 `artifactProductName` 字段）后，
+资产名不再被改写，label 恢复逻辑也不会被触发。`overwrite_files: false` 解决不了这个问题——
+label 恢复与覆盖行为无关。
+
 ## [二开 fork.7] - 2026-10-19
 
 > 构建标签 `v3.16.1-fork.7`，安装包版本 `3.16.2-fork.7`。
@@ -57,7 +88,7 @@
 
 | 平台 | 产物 |
 | --- | --- |
-| Windows x64 | `ZCode.Preview-<版本>-win-x64.exe` |
+| Windows x64 | `ZCode-Preview-<版本>-win-x64.exe` |
 | macOS arm64 | `.dmg` + `.zip` |
 | Linux x64 | `.AppImage` + `.deb` |
 

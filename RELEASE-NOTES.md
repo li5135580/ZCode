@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.1-fork.7`）
+# ZCode 二开增强版（构建标签 `v3.16.1-fork.8`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,37 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode.Preview-3.16.2-fork.7-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode.Preview-3.16.2-fork.7-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode.Preview-3.16.2-fork.7-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode.Preview-3.16.2-fork.7-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode.Preview-3.16.2-fork.7-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode.Preview-3.16.2-fork.7-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.2-fork.8-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.2-fork.8-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.2-fork.8-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.2-fork.8-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.2-fork.8-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.2-fork.8-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.2-fork.7` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.2-fork.8` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.1`，
-> 但按 semver `3.16.2-fork.7 > 3.16.1`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.2-fork.8 > 3.16.1`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🆕 本版新增：输入框下方的用量状态条
+
+对话输入框下方常驻一行轻量指标，无需打开设置页即可看到消耗：
+
+| 指标 | 含义 |
+| --- | --- |
+| 今日 | 当天全应用 token 合计（本地用量库按日聚合） |
+| 本轮 | 当前这一轮的输出速度 tok/s |
+| 上下文 | 上下文占用百分比 |
+| 本会话 | 本会话累计输出 tokens |
+
+点右侧「明细」可看今日 tokens/轮次/工具调用、会话累计的输入输出与缓存读写、上下文具体用量。
+数据只读本地数据库，不上传；今日合计在每轮结束时刷新一次，运行中不轮询。
+
+> 产物文件名本版起改为不含空格的 `ZCode-Preview-*`。此前 `ZCode.Preview-*` 的写法会让
+> GitHub 资产名被替换成点号，并触发发布动作的资产 label 恢复逻辑，导致 Release 卡在草稿态。
 
 ## 🔄 本版对齐上游 v3.16.1
 
@@ -110,7 +127,7 @@ GitHub 上传时替换为点号，不归一化会导致客户端下载 404。
 
 | 平台 | 安装方式 |
 |------|----------|
-| Windows x64 | 运行 `ZCode.Preview-<版本>-win-x64.exe`（会覆盖同 appId 的旧版） |
+| Windows x64 | 运行 `ZCode-Preview-<版本>-win-x64.exe`（会覆盖同 appId 的旧版） |
 | macOS arm64 | 打开 `.dmg`，将 `ZCode Preview` 拖入「应用程序」 |
 | Linux x64 | AppImage：`chmod +x` 后直接运行；deb：`sudo dpkg -i` |
 

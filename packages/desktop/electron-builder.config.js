@@ -274,7 +274,10 @@ const PACKAGING_PRUNE_PATTERNS = [
 
 function buildDesktopArtifactName(platformName, extension = "${ext}") {
   // 测试环境产物必须和正式安装包文件名区分，避免上传、下载或人工验收时混用。
-  return `\${productName}-\${version}-${platformName}-\${arch}${desktopArtifactEnvSuffix}.${extension}`;
+  // 用 artifactProductName（连字符形式）而不是 ${productName} 宏：Preview 身份的
+  // productName 是 `ZCode Preview`（含空格），GitHub 上传时会把空格替换成点号，
+  // 进而触发 action-gh-release 的 label 恢复逻辑（GitHub 已不支持 → 404 → 卡 draft）。
+  return `${desktopProductIdentity.artifactProductName}-\${version}-${platformName}-\${arch}${desktopArtifactEnvSuffix}.${extension}`;
 }
 
 function runAsarCommand(args) {

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// 修正 electron-builder 生成的 latest.yml 中的下载文件名。
+// 修正 electron-builder 生成的更新清单中的下载文件名。
 //
-// 背景：artifactName 里带 ${productName}（`ZCode Preview`，含空格），electron-builder 把
-// 磁盘文件名原样写进 latest.yml 的 files[].url；而 GitHub Release 上传资产时会把空格替换成
-// 点号（实测资产名 `ZCode.Preview-3.15.1-win-x64.exe`，label 仍是 `ZCode Preview-...`）。
-// 客户端按 latest.yml 的 url 拼 `releases/latest/download/<url>`，文件名对不上就是 404。
+// 背景：artifactName 早期带 ${productName}（`ZCode Preview`，含空格），electron-builder 把
+// 磁盘文件名原样写进清单的 files[].url；而 GitHub Release 上传资产时会把空格替换成点号，
+// 客户端按清单的 url 拼 `releases/latest/download/<url>` 就对不上。
 //
-// 这里在打包后、上传前把 url/path 统一改写成 GitHub 的资产命名规则。
+// 现在 artifactName 已改用不含空格的 `ZCode-Preview-*`，正常情况下这里不再需要改名。
+// 保留该步骤作为兜底：任何重新引入空格（或其它 GitHub 会改写的字符）的命名变化，
+// 都会在上传前被修正，而不是等到用户下载 404 才发现。
+//
+// 同时它负责校验清单指向的产物确实存在，这是清单本身无法自证的部分。
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
