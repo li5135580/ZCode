@@ -208,6 +208,11 @@ jobs:
           # 而不是 generate_release_notes 自动生成的空壳正文——后者只有一行
           # compare 链接，用户看不到产物清单与安装注意事项。
           body_path: RELEASE-NOTES.md
+          # 关闭重传覆盖。action 默认 overwrite_files=true，重传同名资产后会去 PATCH
+          # 资产的 label 字段，而 GitHub 已不再接受该字段的写入，接口返回 404，
+          # 表现为资产全部上传成功、Release 却卡在 draft。tag 每次发版都是新的，
+          # 本就不需要覆盖。
+          overwrite_files: false
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
