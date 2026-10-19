@@ -193,36 +193,24 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function barMetrics(bar: HTMLElement): string {
-  // 设置面板与状态条共用同一个 data-testid 容器；断言指标时必须排除面板文案，
-  // 否则「工具调用」「今日合计」这些面板标签会造成误判。
-  const panel = bar.querySelector('[data-testid="usage-settings-panel"]');
-  const clone = bar.cloneNode(true) as HTMLElement;
-  const clonePanel = clone.querySelector('[data-testid="usage-settings-panel"]');
-  if (panel && clonePanel) {
-    clonePanel.remove();
-  }
-  return clone.textContent ?? "";
-}
-
 describe("ComposerUsageStatusBar", () => {
   it("展示上下文、速度、本轮、会话、今日五项默认指标", async () => {
     renderBar({ usage: createUsage() });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
-    await waitFor(() => expect(barMetrics(bar)).toContain("今日"));
+    // 指标用图标 + 数值呈现，断言走各指标的 test-id。
+    await waitFor(() => expect(bar.querySelector('[data-testid="usage-item-today"]')).not.toBeNull());
 
-    const metrics = barMetrics(bar);
     // 上下文 50000/200000 = 25%
-    expect(metrics).toContain("25%");
+    expect(bar.querySelector('[data-testid="usage-item-ctx"]')?.textContent).toContain("25%");
     // 速度来自逐轮事实 500 tok/s
-    expect(metrics).toContain("500");
+    expect(bar.querySelector('[data-testid="usage-item-speed"]')?.textContent).toContain("500");
     // 本轮输出 2000
-    expect(metrics).toContain("2000");
+    expect(bar.querySelector('[data-testid="usage-item-turn"]')?.textContent).toContain("2000");
     // 今日 123.5万
-    expect(metrics).toContain("123.5万");
+    expect(bar.querySelector('[data-testid="usage-item-today"]')?.textContent).toContain("123.5万");
     // 工具调用默认关闭
-    expect(metrics).not.toContain("工具");
+    expect(bar.querySelector('[data-testid="usage-item-tools"]')).toBeNull();
   });
 
   it("enabled=false 时不渲染，也不发起任何查询", async () => {
@@ -293,9 +281,10 @@ describe("ComposerUsageStatusBar", () => {
     renderBar({ usage: createUsage() });
 
     const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
-    await waitFor(() => expect(barMetrics(bar)).toContain("上下文"));
-    const metrics = barMetrics(bar);
-    expect(metrics).not.toContain("今日");
-    expect(metrics).not.toContain("速度");
+    await waitFor(() =>
+      expect(bar.querySelector('[data-testid="usage-item-ctx"]')).not.toBeNull(),
+    );
+    expect(bar.querySelector('[data-testid="usage-item-today"]')).toBeNull();
+    expect(bar.querySelector('[data-testid="usage-item-speed"]')).toBeNull();
   });
 });
