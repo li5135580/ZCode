@@ -17,7 +17,7 @@ import { formatCompactTokenNumber } from "@/lib/tokenNumberFormat.js";
 
 // ── 显示项 ────────────────────────────────────────────────────────────
 
-export const USAGE_BAR_ITEMS = ["ctx", "speed", "turn", "session", "tools", "today"] as const;
+export const USAGE_BAR_ITEMS = ["ctx", "speed", "turn", "session", "tools", "today", "sub"] as const;
 export type UsageBarItem = (typeof USAGE_BAR_ITEMS)[number];
 
 export const DEFAULT_USAGE_BAR_ITEMS: Record<UsageBarItem, boolean> = {
@@ -27,6 +27,7 @@ export const DEFAULT_USAGE_BAR_ITEMS: Record<UsageBarItem, boolean> = {
   session: true,
   tools: false,
   today: true,
+  sub: false,
 };
 
 export interface UsageBarSettings {
@@ -420,4 +421,102 @@ export function resolveSessionCacheHitRate(totals: SessionTotals | null): number
     return null;
   }
   return Math.min(Math.max(totals.cacheReadTokens / totals.inputTokens, 0), 1);
+}
+
+// ── 子智能体 ──────────────────────────────────────────────────────────
+
+export interface SubagentUsageSummary {
+  runningCount: number;
+  /** 有阻塞或等待状态的子代理数量，用于状态点变色。 */
+  attentionCount: number;
+  endedTotal: number;
+  /** 最近若干条已结束任务，用于面板列表。 */
+  recent: Array<{
+    childSessionId: string;
+    title: string;
+    subagentType: string;
+    status: string;
+    durationMs: number | null;
+  }>;
+}
+
+/**
+ * 汇总子智能体状态。
+ *
+ * 用量（token）需要逐个 child session 查询，成本随数量线性增长；
+ * 面板只在用户点开时才需要这些数字，因此这里只做轻量汇总，
+ * 计数与状态点走快照/列表，具体 tokens 留给面板按需拉取。
+ */
+export function resolveSubagentSummary(
+  subagents:
+    | {
+        running?: Array<{ status?: string }>;
+        ended?: { total?: number; items?: Array<Record<string, unknown>> };
+      }
+    | null
+    | undefined,
+  limit = 8,
+): SubagentUsageSummary {
+  const running = subagents?.running ?? [];
+  const endedItems = subagents?.ended?.items ?? [];
+  return {
+    runningCount: running.length,
+    attentionCount: running.filter(
+      (item) => item.status === "blocked" || item.status === "waiting",
+    ).length,
+    endedTotal: subagents?.ended?.total ?? 0,
+    recent: endedItems.slice(0, limit).map((item) => {
+      const startedAt = typeof item.startedAt === "number" ? item.startedAt : null;
+      const endedAt = typeof item.endedAt === "number" ? item.endedAt : null;
+      return {
+        childSessionId: String(item.childSessionId ?? ""),
+        title: String(item.title ?? ""),
+        subagentType: String(item.subagentType ?? ""),
+        status: String(item.status ?? ""),
+        durationMs:
+          startedAt !== null && endedAt !== null ? Math.max(0, endedAt - startedAt) : null,
+      };
+    }),
+  };
+}
+
+// ── 上下文超限 ────────────────────────────────────────────────────────
+
+/**
+ * 判断是否处于「上下文超限被拒」状态。
+ *
+ * 依据是会话最近一次错误是否是上下文超限。CLI 把这类失败归一成固定标记集
+ * （见 core/runtime/helpers/model-errors.ts 的 MODEL_CONTEXT_EXCEEDED_MARKERS），
+ * 这里用同一组标记匹配 `lastError.code`，避免依赖某个供应商的原文措辞。
+ */
+const CONTEXT_EXCEEDED_MARKERS = new Set([
+  "ModelContextExceeded",
+  "context_exceeded",
+  "context_length_exceeded",
+  "context_window_exceeded",
+  "model_context_window_exceeded",
+  "prompt_too_long",
+]);
+
+export function isContextExceededErrorCode(code: string | null | undefined): boolean {
+  if (!code) {
+    return false;
+  }
+  const normalized = code.trim();
+  if (CONTEXT_EXCEEDED_MARKERS.has(normalized)) {
+    return true;
+  }
+  // 供应商常把具体模型名塞进 code（如 xxx_context_length_exceeded），用包含匹配兜住。
+  return /context_(?:length|window)_exceeded|prompt_too_long|context_exceeded/i.test(normalized);
+}
+
+export function isContextExceededActive(input: {
+  lastErrorCode: string | null | undefined;
+  phase: string | null | undefined;
+}): boolean {
+  // 只在该轮确实失败时提示；已恢复运行/成功的轮次不残留告警。
+  if (input.phase !== "error") {
+    return false;
+  }
+  return isContextExceededErrorCode(input.lastErrorCode);
 }

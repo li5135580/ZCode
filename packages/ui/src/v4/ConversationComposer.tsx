@@ -2684,6 +2684,7 @@ function ConversationComposerImpl({
       <ComposerUsageStatusBar
         usage={composerUsage}
         phase={composerPhase}
+        lastErrorCode={snapshot?.control.lastError?.code ?? null}
         enabled={!centered}
         workspacePath={workspacePath}
         workspaceIdentity={workspaceIdentity}

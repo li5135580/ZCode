@@ -269,7 +269,7 @@ describe("ComposerUsageStatusBar", () => {
     expect(bar.textContent?.match(/—/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("设置面板包含全部六项开关与上下文窗口覆盖", async () => {
+  it("设置面板包含全部七项开关与上下文窗口覆盖", async () => {
     renderBar({ usage: createUsage() });
 
     const panel = await screen.findByTestId("usage-settings-panel");
@@ -279,9 +279,10 @@ describe("ComposerUsageStatusBar", () => {
     expect(panel.textContent).toContain("会话累计");
     expect(panel.textContent).toContain("工具调用");
     expect(panel.textContent).toContain("今日合计");
+    expect(panel.textContent).toContain("子智能体");
     expect(panel.textContent).toContain("中文单位");
-    // 六个显示项 + 中文单位 = 7 个 checkbox
-    expect(panel.querySelectorAll('input[type="checkbox"]').length).toBe(7);
+    // 七个显示项 + 中文单位 = 8 个 checkbox
+    expect(panel.querySelectorAll('input[type="checkbox"]').length).toBe(8);
   });
 
   it("从本地设置读回已关闭的显示项", async () => {

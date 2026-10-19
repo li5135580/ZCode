@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import { ChevronDown, Settings2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, Settings2 } from "lucide-react";
 import { TID_V4_COMPOSER_USAGE_STATUS_BAR } from "@zcode/shared/test-ids";
 import type { SessionUsageState } from "@zcode/shared/zcode-protocol-v4";
 import { cn } from "@/components/lib/utils.js";
@@ -18,6 +18,7 @@ import {
   resolveSessionTotals,
   resolveSpeedTier,
   resolveTodayUsage,
+  isContextExceededActive,
   USAGE_BAR_ITEMS,
   writeUsageBarSettings,
   type UsageBarItem,
@@ -29,6 +30,8 @@ import { useComposerUsageStatusBar } from "@/v4/composer/useComposerUsageStatusB
 export interface ComposerUsageStatusBarProps {
   usage: SessionUsageState | null;
   phase: string | null;
+  /** 会话最近一次错误的 code；用于判定上下文超限。 */
+  lastErrorCode?: string | null;
   enabled?: boolean;
   className?: string;
   workspacePath?: string;
@@ -106,6 +109,7 @@ function ContextMeter({
 export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   usage,
   phase,
+  lastErrorCode = null,
   enabled = true,
   className,
   workspacePath,
@@ -120,6 +124,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     turnRate,
     turnDetail,
     taskUsage,
+    subagents,
     available,
   } = useComposerUsageStatusBar({
     usage,
@@ -144,6 +149,13 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   const contextTier = resolveContextTier(contextRatio);
   const sessionTotals = useMemo(() => resolveSessionTotals(taskUsage, usage), [taskUsage, usage]);
   const sessionHitRate = resolveSessionCacheHitRate(sessionTotals);
+
+  // 超限状态由会话最近一次错误判定：CLI 已把这类失败归一成固定标记集，
+  // 拿不到错误时自然为 false，不会误报。
+  const contextExceeded = useMemo(
+    () => isContextExceededActive({ lastErrorCode: lastErrorCode, phase }),
+    [lastErrorCode, phase],
+  );
 
   // 速率优先用逐轮事实（数据库口径），退回本地推算值。
   const effectiveRate = turnDetail?.tokensPerSecond ?? turnRate?.tokensPerSecond ?? null;
@@ -334,6 +346,46 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
     });
   }
 
+  if (settings.items.sub) {
+    const runningCount = subagents?.runningCount ?? 0;
+    const attention = (subagents?.attentionCount ?? 0) > 0;
+    items.push({
+      key: "sub",
+      node: (
+        <span
+          key="sub"
+          className="flex shrink-0 items-center gap-1"
+          title={
+            subagents
+              ? intl.formatMessage(
+                  { id: "chat.composerUsage.subTitle" },
+                  { running: runningCount, ended: subagents.endedTotal },
+                )
+              : undefined
+          }
+        >
+          <span className="text-foreground-subtle/70">
+            {intl.formatMessage({ id: "chat.composerUsage.sub" })}
+          </span>
+          <span
+            className={cn(
+              "inline-block size-1.5 rounded-full",
+              attention
+                ? "animate-pulse bg-[var(--color-warning)]"
+                : runningCount > 0
+                  ? "animate-pulse bg-[var(--color-success)]"
+                  : "bg-foreground/30",
+            )}
+            aria-hidden="true"
+          />
+          <span className="font-mono tabular-nums text-foreground-subtle">
+            {runningCount > 0 ? runningCount : placeholder}
+          </span>
+        </span>
+      ),
+    });
+  }
+
   return (
     <div
       data-testid={TID_V4_COMPOSER_USAGE_STATUS_BAR}
@@ -346,6 +398,17 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
       {!anyItemVisible ? (
         <span className="truncate text-foreground-subtle/60">
           {intl.formatMessage({ id: "chat.composerUsage.allHidden" })}
+        </span>
+      ) : null}
+      {contextExceeded ? (
+        // 上下文超限：最近一次请求被拒且此后没有成功请求。
+        // 只给结论和出路，不堆错误原文——具体报错在会话的错误横幅里已有。
+        <span
+          className="flex shrink-0 items-center gap-1 text-[var(--color-danger)]"
+          title={intl.formatMessage({ id: "chat.composerUsage.contextExceededHint" })}
+        >
+          <AlertTriangle className="size-3" aria-hidden="true" />
+          {intl.formatMessage({ id: "chat.composerUsage.contextExceeded" })}
         </span>
       ) : null}
 

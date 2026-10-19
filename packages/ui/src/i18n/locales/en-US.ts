@@ -1577,6 +1577,12 @@ const enUS: Record<string, string> = {
   "chat.composerUsage.item.session": "Session total",
   "chat.composerUsage.item.tools": "Tool calls",
   "chat.composerUsage.item.today": "Today's total",
+  "chat.composerUsage.item.sub": "Sub-agents",
+  "chat.composerUsage.sub": "Sub-agents",
+  "chat.composerUsage.subTitle": "{running} running · {ended} finished",
+  "chat.composerUsage.contextExceeded": "Context over limit",
+  "chat.composerUsage.contextExceededHint":
+    "The latest request exceeded the context window. Compact or start a new session to continue.",
   "sidePane.launcher.selection-side-conversation": "Continue a conversation in the side pane.",
   "sidePane.launcher.review": "Review code changes and diffs.",
   "sidePane.launcher.terminal": "Run commands and view output.",

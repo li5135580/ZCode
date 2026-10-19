@@ -9,6 +9,8 @@ import {
   isTurnRunningPhase,
   readUsageBarSettings,
   resolveLatestTurnDetail,
+  resolveSubagentSummary,
+  type SubagentUsageSummary,
   type TurnRateBaseline,
   type TurnRateSample,
   type UsageBarSettings,
@@ -59,6 +61,7 @@ export function useComposerUsageStatusBar({
   const [turnRate, setTurnRate] = useState<TurnRateSample | null>(null);
   const [turnDetail, setTurnDetail] = useState<TurnUsageDetail | null>(null);
   const [taskUsage, setTaskUsage] = useState<ZCodeTaskTokenUsageResult | null>(null);
+  const [subagents, setSubagents] = useState<SubagentUsageSummary | null>(null);
   const requestVersionRef = useRef(0);
   const baselineRef = useRef<TurnRateBaseline | null>(null);
   const previousPhaseRef = useRef<string | null>(null);
@@ -121,6 +124,23 @@ export function useComposerUsageStatusBar({
         error: error instanceof Error ? error.message : String(error),
       });
     }
+
+    // 子代理只在有 child session 时才查，避免空会话多一次 IPC。
+    try {
+      const result = await zcodeAgentService.listSessionSubagents({
+        workspacePath: target.workspacePath,
+        workspaceIdentity,
+        sessionId,
+        endedLimit: 8,
+      });
+      if (requestVersionRef.current === requestVersion) {
+        setSubagents(resolveSubagentSummary(result));
+      }
+    } catch (error) {
+      logger.warn("[composer-usage-status-bar] 读取子代理失败", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }, [enabled, sessionId, usageStatsService, workspaceIdentity, workspacePath, zcodeAgentService]);
 
   // 首次进入会话时取一次，之后只在轮次结束时重查。
@@ -176,6 +196,7 @@ export function useComposerUsageStatusBar({
     turnRate,
     turnDetail,
     taskUsage,
+    subagents,
     refresh,
     /** 没有用量服务时不渲染状态条，保持 composer 的原有渲染契约。 */
     available: Boolean(usageStatsService),

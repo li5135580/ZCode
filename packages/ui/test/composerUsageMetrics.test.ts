@@ -4,6 +4,8 @@ import {
   computeTurnRate,
   DEFAULT_USAGE_BAR_ITEMS,
   formatTokens,
+  isContextExceededActive,
+  isContextExceededErrorCode,
   isTurnEndPhase,
   isTurnRunningPhase,
   parseUsageBarSettings,
@@ -15,6 +17,7 @@ import {
   resolveSessionCacheHitRate,
   resolveSessionTotals,
   resolveSpeedTier,
+  resolveSubagentSummary,
   resolveTodayUsage,
   USAGE_BAR_ITEMS,
 } from "../src/v4/composer/composerUsageMetrics.js";
@@ -124,7 +127,7 @@ describe("composer 用量状态条计算", () => {
         .contextWindowOverride).toBeNull();
     });
 
-    it("显示项清单覆盖插件里的六项", () => {
+    it("显示项清单覆盖插件里的七项", () => {
       expect([...USAGE_BAR_ITEMS]).toEqual([
         "ctx",
         "speed",
@@ -132,6 +135,7 @@ describe("composer 用量状态条计算", () => {
         "session",
         "tools",
         "today",
+        "sub",
       ]);
     });
   });
@@ -320,8 +324,7 @@ describe("composer 用量状态条计算", () => {
     });
   });
 
-  describe("会话累计", () => {
-    const taskUsage = {
+  describe("会话累计", () => {    const taskUsage = {
       sessionId: "s1",
       totalTokens: 1000,
       inputTokens: 800,
@@ -363,6 +366,85 @@ describe("composer 用量状态条计算", () => {
     it("两者都缺时返回 null", () => {
       expect(resolveSessionTotals(null, null)).toBeNull();
       expect(resolveSessionCacheHitRate(null)).toBeNull();
+    });
+  });
+
+  describe("子智能体汇总", () => {
+    it("统计运行中、需关注与已结束数量", () => {
+      const summary = resolveSubagentSummary({
+        running: [{ status: "running" }, { status: "blocked" }, { status: "waiting" }],
+        ended: {
+          total: 12,
+          items: [
+            {
+              childSessionId: "c1",
+              title: "分析依赖",
+              subagentType: "explore",
+              status: "success",
+              startedAt: 1000,
+              endedAt: 4000,
+            },
+          ],
+        },
+      });
+
+      expect(summary.runningCount).toBe(3);
+      expect(summary.attentionCount).toBe(2);
+      expect(summary.endedTotal).toBe(12);
+      expect(summary.recent[0]).toEqual({
+        childSessionId: "c1",
+        title: "分析依赖",
+        subagentType: "explore",
+        status: "success",
+        durationMs: 3000,
+      });
+    });
+
+    it("缺数据时返回零值而不是抛错", () => {
+      expect(resolveSubagentSummary(null)).toEqual({
+        runningCount: 0,
+        attentionCount: 0,
+        endedTotal: 0,
+        recent: [],
+      });
+    });
+
+    it("已结束列表按 limit 截断", () => {
+      const items = Array.from({ length: 20 }, (_, index) => ({
+        childSessionId: `c${index}`,
+        title: `t${index}`,
+        subagentType: "x",
+        status: "success",
+      }));
+      const summary = resolveSubagentSummary({ ended: { total: 20, items } }, 5);
+      expect(summary.recent).toHaveLength(5);
+    });
+  });
+
+  describe("上下文超限判定", () => {
+    it("识别 CLI 归一化的超限错误码", () => {
+      expect(isContextExceededErrorCode("context_length_exceeded")).toBe(true);
+      expect(isContextExceededErrorCode("prompt_too_long")).toBe(true);
+      expect(isContextExceededErrorCode("ModelContextExceeded")).toBe(true);
+      // 供应商把模型名塞进 code 时也能命中
+      expect(isContextExceededErrorCode("glm_5_context_window_exceeded")).toBe(true);
+      expect(isContextExceededErrorCode("rate_limited")).toBe(false);
+      expect(isContextExceededErrorCode(null)).toBe(false);
+    });
+
+    it("只在 error 阶段提示，恢复后不残留", () => {
+      expect(
+        isContextExceededActive({ lastErrorCode: "context_length_exceeded", phase: "error" }),
+      ).toBe(true);
+      expect(
+        isContextExceededActive({
+          lastErrorCode: "context_length_exceeded",
+          phase: "completedSuccess",
+        }),
+      ).toBe(false);
+      expect(isContextExceededActive({ lastErrorCode: "rate_limited", phase: "error" })).toBe(
+        false,
+      );
     });
   });
 });
