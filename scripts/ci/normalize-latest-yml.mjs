@@ -22,12 +22,15 @@ export function toGitHubAssetName(fileName) {
 }
 
 /**
- * 改写 latest.yml 文本里的下载地址。
+ * 改写 latest.yml 文本里的下载地址，并可选注入本次更新说明。
  *
  * @param {string} content latest.yml 原始内容
+ * @param {{ releaseNotes?: string | null }} [options]
+ *   releaseNotes：更新说明 markdown。electron-builder 生成的清单不带该字段，
+ *   客户端「发现新版本」弹窗因此没有内容可展示；在这里统一注入。
  * @returns {{ content: string, renamed: Array<{ from: string, to: string }> }}
  */
-export function rewriteLatestYml(content) {
+export function rewriteLatestYml(content, options = {}) {
   const parsed = parse(content);
   if (!parsed || typeof parsed !== "object") {
     throw new Error("latest.yml 不是合法的 YAML 对象");
@@ -69,6 +72,13 @@ export function rewriteLatestYml(content) {
   // electron-updater 1.x 兼容字段，与 files[0].url 保持一致。
   if (typeof parsed.path === "string" && parsed.path !== "") {
     parsed.path = renameUrl(parsed.path);
+  }
+
+  // electron-builder 不会把更新说明写进清单，导致客户端「发现新版本」弹窗只有
+  // 版本号、没有内容。这里注入仓库维护的 RELEASE-NOTES.md，与 Release 正文同源。
+  const releaseNotes = options.releaseNotes?.trim();
+  if (releaseNotes) {
+    parsed.releaseNotes = releaseNotes;
   }
 
   return { content: stringify(parsed), renamed };
@@ -121,7 +131,22 @@ if (entryFilePath === currentFilePath) {
     }
 
     const original = readFileSync(ymlPath, "utf8");
-    const { content, renamed } = rewriteLatestYml(original);
+    // 更新说明与 Release 正文同源：都用仓库维护的 RELEASE-NOTES.md。
+    // 未传该参数时保持清单原样（不注入空字段），兼容既有调用方。
+    const releaseNotesPath = readArg(process.argv.slice(2), "--release-notes");
+    let releaseNotes = null;
+    if (releaseNotesPath) {
+      const absoluteNotesPath = resolve(releaseNotesPath);
+      if (!existsSync(absoluteNotesPath)) {
+        throw new Error(`更新说明文件不存在: ${absoluteNotesPath}`);
+      }
+      releaseNotes = readFileSync(absoluteNotesPath, "utf8");
+      if (!releaseNotes.trim()) {
+        throw new Error(`更新说明文件为空: ${absoluteNotesPath}`);
+      }
+    }
+
+    const { content, renamed } = rewriteLatestYml(original, { releaseNotes });
     writeFileSync(ymlPath, content, "utf8");
 
     const missing = verifyLatestYmlArtifacts(distDir, content);

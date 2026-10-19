@@ -190,3 +190,24 @@ describe("macOS / Windows 更新解析保持兼容", () => {
     expect(resolved[0]?.info.sha512).toBe("legacy");
   });
 });
+
+describe("更新说明从清单透传", () => {
+  // CI 在归一化阶段把 RELEASE-NOTES.md 注入清单的 releaseNotes 字段。
+  // 这里验证它不会被 provider 的解析丢弃——丢掉就等于客户端弹窗没有内容。
+  it("getLatestVersion 保留清单里的 releaseNotes", async () => {
+    const notes = "# 二开增强版\n\n- 新增用量状态条\n- 修复更新弹窗";
+    const provider = new ManifestUpdateProvider(
+      { provider: "custom", endpointOrigin: "https://zcode.example.test" },
+      Object.create(NsisUpdater.prototype),
+      { platform: "win32", isUseMultipleRangeRequest: false, executor: {} as never },
+    );
+    vi.spyOn(provider as unknown as { httpRequest: unknown }, "httpRequest").mockResolvedValue(
+      `version: 3.16.2-fork.9\nfiles:\n  - url: ZCode-Preview-3.16.2-fork.9-win-x64.exe\n    sha512: abc\nreleaseNotes: |-\n  # 二开增强版\n\n  - 新增用量状态条\n  - 修复更新弹窗\n`,
+    );
+
+    const info = await provider.getLatestVersion();
+
+    expect(info.version).toBe("3.16.2-fork.9");
+    expect(info.releaseNotes).toBe(notes);
+  });
+});

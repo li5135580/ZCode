@@ -120,4 +120,43 @@ releaseDate: '2026-10-18T00:00:00.000Z'
     expect(parsed.files[0].url).toBe("ZCode.Preview-3.15.2-fork.6-linux-x64.AppImage");
     expect(parsed.path).toBe("ZCode.Preview-3.15.2-fork.6-linux-x64.AppImage");
   });
+
+  // electron-builder 不会把 release notes 写进清单，客户端「发现新版本」弹窗因此
+  // 只有版本号、没有内容。CI 在归一化阶段注入 RELEASE-NOTES.md。
+  describe("注入更新说明", () => {
+    const notes = "# 二开增强版\n\n- 新增用量状态条\n- 修复更新弹窗";
+
+    it("传入 releaseNotes 时写入清单，且保持 markdown 原样", () => {
+      const { content } = rewriteLatestYml(SAMPLE, { releaseNotes: notes });
+      const parsed = parse(content);
+
+      expect(parsed.releaseNotes).toBe(notes);
+      // 注入不能破坏其它字段。
+      expect(parsed.version).toBe("3.15.2-fork.2");
+      expect(parsed.files[0].sha512).toBe("abc123");
+    });
+
+    it("未传或为空时不写入该字段，避免客户端拿到空壳说明", () => {
+      expect(parse(rewriteLatestYml(SAMPLE).content).releaseNotes).toBeUndefined();
+      expect(
+        parse(rewriteLatestYml(SAMPLE, { releaseNotes: "   \n  " }).content).releaseNotes,
+      ).toBeUndefined();
+    });
+
+    it("多行 markdown 在 YAML 往返后不丢换行", () => {
+      const multiLine = [
+        "# 标题",
+        "",
+        "## 新增",
+        "",
+        "- 第一项",
+        "- 第二项",
+        "",
+        "> 引用说明",
+      ].join("\n");
+      const parsed = parse(rewriteLatestYml(SAMPLE, { releaseNotes: multiLine }).content);
+
+      expect(parsed.releaseNotes).toBe(multiLine);
+    });
+  });
 });

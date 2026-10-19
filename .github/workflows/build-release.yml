@@ -124,10 +124,13 @@ jobs:
 
       - name: Normalize update manifest asset urls
         shell: bash
-        # electron-builder 把磁盘上的真实文件名写进更新清单，而 artifactName 含 ${productName}
-        # （`ZCode Preview`，带空格）。GitHub Release 上传时会把空格替换成点号，
-        # 若清单仍写带空格的 url，客户端拼出的 releases/latest/download/<url> 会 404。
+        # electron-builder 把磁盘上的真实文件名写进更新清单；若命名含空格，GitHub Release
+        # 上传时会把空格替换成点号，客户端拼出的 releases/latest/download/<url> 会 404。
         # 清单文件名随平台变化：Windows latest.yml、macOS latest-mac.yml、Linux latest-linux.yml。
+        #
+        # 同时注入更新说明：electron-builder 不会把 release notes 写进清单，客户端
+        # 「发现新版本」弹窗因此只有版本号、没有内容。这里用仓库维护的 RELEASE-NOTES.md，
+        # 与 Release 正文保持同一份来源。
         run: |
           set -euo pipefail
           case "${{ matrix.target }}" in
@@ -135,10 +138,18 @@ jobs:
             linux) manifest="latest-linux.yml" ;;
             *) manifest="latest.yml" ;;
           esac
-          node scripts/ci/normalize-latest-yml.mjs --dir packages/desktop/dist --file "$manifest"
+          node scripts/ci/normalize-latest-yml.mjs \
+            --dir packages/desktop/dist \
+            --file "$manifest" \
+            --release-notes RELEASE-NOTES.md
           echo "=== $manifest ==="
           cat "packages/desktop/dist/$manifest"
           test -s "packages/desktop/dist/$manifest" || { echo "::error::$manifest 缺失或为空"; exit 1; }
+          # 更新说明缺失时客户端弹窗会退化成空壳，这里直接拦下。
+          grep -q "^releaseNotes:" "packages/desktop/dist/$manifest" || {
+            echo "::error::$manifest 未注入 releaseNotes，客户端更新弹窗将没有内容"
+            exit 1
+          }
 
       - name: Verify Linux update manifest points at AppImage
         shell: bash
