@@ -366,15 +366,18 @@ describe("UpdateStatusButton release notes", () => {
     ).toBe(false);
   });
 
-  it("omits release notes from the update dialog", () => {
+  // 二开改动：更新弹窗此前刻意不展示说明，只靠「安装后」的 PostUpdateReleaseNotesDialog
+  // 补上；但那个组件没有任何挂载点，导致用户只看到版本号和日期。
+  // 现在弹窗自己渲染说明（下载中除外，进度条才是主信息）。
+  it("shows release notes in the update dialog except while downloading", () => {
     expect(
       updateStatusDialogElementContainsText("before-download", "Visible before downloading"),
-    ).toBe(false);
+    ).toBe(true);
     expect(updateStatusDialogElementContainsText("downloading", "Visible before downloading")).toBe(
       false,
     );
     expect(updateStatusDialogElementContainsText("downloaded", "Visible before downloading")).toBe(
-      false,
+      true,
     );
   });
 
@@ -463,17 +466,19 @@ describe("UpdateStatusButton release notes", () => {
     );
   });
 
-  it("does not reserve an empty content row in the standalone update window before download", () => {
+  // 二开改动：弹窗现在渲染更新说明，中间行有内容，因此必须恢复三行布局
+  // （否则说明会被压成 0 高或撑不开）。没有说明时仍沿用原来的两行，不留空行。
+  it("reserves a content row in the standalone update window when release notes exist", () => {
     expect(
       updateStatusDialogElementContainsPropText("before-download", "grid-rows-[auto_auto]", true),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       updateStatusDialogElementContainsPropText(
         "before-download",
         "grid-rows-[auto_minmax(0,1fr)_auto]",
         true,
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       updateStatusDialogElementContainsPropText(
         "downloading",

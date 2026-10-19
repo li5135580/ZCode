@@ -1,5 +1,6 @@
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
+import { MessageResponse } from "@/components/ai-elements/message.js";
 import { Button } from "@/components/ui/button.js";
 import {
   Dialog,
@@ -26,10 +27,12 @@ export function UpdateStatusDialog({
   intl,
   isUpdateActionPending,
   autoDownloadAndInstallUpdates,
+  localizedUpdateReleaseNotes,
   onAutoDownloadAndInstallUpdatesChange,
   onCancelDownload,
   onDownloadUpdate,
   onOpenChange,
+  onOpenReleaseNotesExternalUrl,
   onRestartUpdate,
   onSkipUpdate,
   open,
@@ -76,6 +79,9 @@ export function UpdateStatusDialog({
   });
   const showSkipVersion = isBeforeDownload && Boolean(skippableVersion);
   const showLaterButton = !isDownloading;
+  // 下载中不展示更新说明（进度条才是这一阶段的主信息）；其余阶段只要有内容就展示。
+  const releaseNotesMarkdown = localizedUpdateReleaseNotes?.markdown?.trim() ?? "";
+  const showReleaseNotes = !isDownloading && releaseNotesMarkdown.length > 0;
   const titleClassName =
     "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui-base font-medium leading-5 text-foreground";
   const titleContent = (
@@ -90,9 +96,12 @@ export function UpdateStatusDialog({
   const contentClassName = cn(
     "max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-5 sm:max-w-lg",
     edgeToEdge && !isDownloading
-      ? // 普通/下载完成状态没有中间内容，不能继续使用 minmax(0,1fr)。
+      ? // 普通/下载完成状态没有中间内容时不能继续使用 minmax(0,1fr)，
         // 否则 footer 会占满剩余窗口高度，按钮被垂直居中后看起来像中间有大块空白。
-        "grid-rows-[auto_auto]"
+        // 有更新说明时中间那一行必须可滚动，恢复成三行布局。
+        showReleaseNotes
+        ? "grid-rows-[auto_minmax(0,1fr)_auto]"
+        : "grid-rows-[auto_auto]"
       : "grid-rows-[auto_minmax(0,1fr)_auto]",
     edgeToEdge
       ? // 独立更新窗口已经由 BrowserWindow 提供窗口边框和阴影。
@@ -146,6 +155,29 @@ export function UpdateStatusDialog({
               indicatorClassName="bg-primary"
             />
           </section>
+        </div>
+      ) : null}
+
+      {showReleaseNotes ? (
+        // 更新说明正文。此前该 props 只声明不使用，弹窗里只剩版本号和一个日期，
+        // 用户看不到这次更新了什么。下载中不展示（进度条才是主信息）。
+        <div className="min-h-0 overflow-y-auto [app-region:no-drag]">
+          <div
+            data-testid="update-release-notes"
+            className="max-h-[min(46vh,22rem)] overflow-y-auto rounded-lg border border-border bg-surface px-4 py-3"
+          >
+            <MessageResponse
+              className={cn(
+                "prose prose-sm max-w-none text-foreground dark:prose-invert",
+                // 标题逐级压小，避免 changelog 里的 # / ## 抢过弹窗标题的视觉层级。
+                "prose-headings:font-semibold prose-headings:tracking-tight",
+                "prose-h1:text-ui-lg prose-h2:text-ui-base prose-h3:text-ui-base prose-h4:text-ui-base prose-h5:text-ui-base prose-h6:text-ui-base",
+              )}
+              onOpenExternalUrl={onOpenReleaseNotesExternalUrl}
+            >
+              {releaseNotesMarkdown}
+            </MessageResponse>
+          </div>
         </div>
       ) : null}
 

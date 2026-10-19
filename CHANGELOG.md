@@ -2,21 +2,24 @@
 
 本文件记录 ZCode 二开增强版的所有重要变更。
 
-## [二开 fork.10] - 2026-10-19
+## [二开 fork.11] - 2026-10-19
 
-> 构建标签 `v3.16.1-fork.10`，安装包版本 `3.16.2-fork.10`。
+> 构建标签 `v3.16.1-fork.11`，安装包版本 `3.16.2-fork.11`。
 
 ### 修复：更新弹窗没有内容
 
-客户端「发现新版本」弹窗此前只有版本号，看不到本次更新了什么。
+客户端「发现新版本」弹窗此前只有版本号和一个日期，看不到本次更新了什么。这是两处问题叠加：
 
-根因：electron-builder 生成的更新清单（`latest.yml` / `latest-mac.yml` /
-`latest-linux.yml`）里没有 `releaseNotes` 字段——它不会自动把仓库的发布说明写进去，
-而弹窗只渲染清单带来的内容。
+1. **数据没到**：electron-builder 生成的更新清单（`latest.yml` / `latest-mac.yml` /
+   `latest-linux.yml`）里没有 `releaseNotes` 字段——它不会自动把仓库的发布说明写进去。
+   修法：CI 在清单归一化阶段用 `--release-notes RELEASE-NOTES.md` 注入，与 Release 正文
+   同一份来源；三平台都注入，并加校验步骤，缺少该字段直接让构建失败。
+2. **UI 不渲染**：`UpdateStatusDialog` 声明了 `localizedUpdateReleaseNotes` 这个 props
+   却从未使用。上游的设计是安装前不显示、靠安装后的 `PostUpdateReleaseNotesDialog` 补上，
+   但那个组件**没有任何挂载点**，整条链路是断的。现在弹窗自己渲染说明（下载中除外）。
 
-修法：CI 在清单归一化阶段用 `--release-notes RELEASE-NOTES.md` 注入，
-与 Release 正文保持同一份来源。三平台清单都注入，并加校验步骤——缺少该字段直接失败，
-避免又发出一个没有内容的弹窗。未传参数时行为不变，兼容既有调用。
+顺带把换行归一成 LF：Windows runner checkout 得到 CRLF、mac/Linux 得到 LF，
+不归一会让同一版本的三份清单逐字节不一致。
 
 ### 新增：输入框下方的 token 用量状态条
 
