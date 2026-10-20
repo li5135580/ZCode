@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.1-fork.14`）
+# ZCode 二开增强版（构建标签 `v3.16.1-fork.15`）
 
 ## 📦 发布内容
 
@@ -7,17 +7,17 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.2-fork.14-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.2-fork.14-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.2-fork.14-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.2-fork.14-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.2-fork.14-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.2-fork.14-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.2-fork.15-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.2-fork.15-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.2-fork.15-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.2-fork.15-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.2-fork.15-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.2-fork.15-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.2-fork.14` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.2-fork.15` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.1`，
-> 但按 semver `3.16.2-fork.14 > 3.16.1`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.2-fork.15 > 3.16.1`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
@@ -40,6 +40,26 @@
 5. **速度占位更准确**：刚重启客户端、还没产生任何请求时仍显示 `—`（这是正常状态）。
    如果只是最新一段请求缺首字延迟，会沿用前一段的有效速率，或用本轮累计
    `输出 ÷ 生成耗时` 兜底，不再整轮显示 `—`。
+
+## 🐛 本版修复：生成速度显示上万 t/s
+
+有反馈状态条出现过 `10,619 t/s` 这种数字。核对本地数据库（15,168 条已完成请求）后
+定位到两处口径问题，都是「分母被算小」：
+
+1. **中转缓冲了 SSE**：部分中转/网关不会逐字转发，而是攒完再一次性 flush。这时
+   「首字延迟」几乎等于「请求总耗时」，两者相减只剩几十毫秒。库里最高的一条是
+   `总耗时 155,079ms / 首字 155,005ms / 输出 592 tokens` —— 差值 74ms，于是算出
+   8,000 t/s。全库有 41 条这样失真超过 1,000 t/s。现在首字延迟若不在请求前 90% 内，
+   就判定为缓冲流，生成耗时留空（显示 `—`），不再拿失真的差值当分母。
+2. **聚合兜底分子分母不同源**：某些请求缺首字延迟、算不出耗时，旧逻辑却仍把它们
+   的输出计入分子，分母只累加了有耗时的那几段，速率被进一步放大。现在只统计
+   「同一批既有耗时、速率也合理」的段。
+
+另外加了两道防线：单段速率超过 1,000 t/s 直接丢弃（当前最快的模型也就 200–400 量级），
+墙钟估算的速率同样要过这个上限。修复后用真实数据回放，41 条异常全部归零。
+
+> 代价是：走缓冲型中转时速度会显示 `—` 而不是一个偏低的估计值。这是有意的——
+> 宁可说「不知道」，也不给一个差几十倍的假数字。
 
 ## 🆕 输入框下方的用量状态条
 
