@@ -260,6 +260,17 @@ describe("composer 用量状态条计算", () => {
         ),
       ).toBeNull();
     });
+
+    it("拒绝超出物理上限的墙钟估算", () => {
+      // 起点在轮次中途才建立时，增量会被压缩到极短耗时里：5000 tokens / 300ms
+      // 会算出 16667 t/s。这是口径错位，不是真的快。
+      expect(
+        computeTurnRate(
+          { outputTokens: 0, startedAtMs: 0 },
+          { outputTokens: 5000, endedAtMs: 300 },
+        ),
+      ).toBeNull();
+    });
   });
 
   describe("resolveLatestTurnDetail", () => {
@@ -321,6 +332,38 @@ describe("composer 用量状态条计算", () => {
 
       // 200 tokens / 1000ms = 200 tok/s
       expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeCloseTo(200);
+    });
+
+    it("丢弃超出物理上限的速率，避免分母失真时显示上万 t/s", () => {
+      const debug = buildDebug([
+        // 中转缓冲导致 generationDurationMs 塌成 74ms，算出 8000 t/s
+        { recordedAt: 1000, input: 100, output: 592, duration: 74, tps: 8000 },
+      ]);
+
+      const detail = resolveLatestTurnDetail(debug);
+      expect(detail?.tokensPerSecond).toBeNull();
+      // 失真的耗时同样不能展示（否则会显示「生成耗时 0.1s」）
+      expect(detail?.generationDurationMs).toBeNull();
+    });
+
+    it("前一段可信时，后面超限的段不会覆盖它", () => {
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 100, output: 200, duration: 2000, tps: 100 },
+        { recordedAt: 2000, input: 100, output: 592, duration: 74, tps: 8000 },
+      ]);
+
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBe(100);
+    });
+
+    it("兜底时分子只算有耗时的那几段，避免分母缺失导致速率虚高", () => {
+      // 第 1 段没有生成耗时（缺首字延迟），输出 5000；第 2 段有耗时 1000ms，输出 100。
+      // 若用全部输出 5100 ÷ 1000ms 会得到 5100 t/s；正确口径是 100 ÷ 1000ms = 100。
+      const debug = buildDebug([
+        { recordedAt: 1000, input: 100, output: 5000, duration: null, tps: null },
+        { recordedAt: 2000, input: 100, output: 100, duration: 1000, tps: null },
+      ]);
+
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeCloseTo(100);
     });
   });
 

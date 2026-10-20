@@ -22,6 +22,7 @@ import {
   formatRate,
   formatTokens,
   isContextExceededActive,
+  MAX_PLAUSIBLE_TPS,
   resolveCacheTier,
   resolveContextMaxTokens,
   resolveContextTier,
@@ -168,7 +169,9 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   const sessionHitRate = resolveSessionCacheHitRate(sessionTotals);
 
   // 速率优先用逐轮事实（数据库口径），退回本地推算值。
-  const effectiveRate = turnDetail?.tokensPerSecond ?? turnRate?.tokensPerSecond ?? null;
+  // 最后再过一道上限：两个来源都已各自校验，这里兜住未来新增来源的同类失真。
+  const rawRate = turnDetail?.tokensPerSecond ?? turnRate?.tokensPerSecond ?? null;
+  const effectiveRate = rawRate !== null && rawRate <= MAX_PLAUSIBLE_TPS ? rawRate : null;
   const speedTier = resolveSpeedTier(effectiveRate);
 
   // 超限状态由会话最近一次错误判定：CLI 已把这类失败归一成固定标记集，

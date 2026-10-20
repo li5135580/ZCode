@@ -102,8 +102,17 @@ export function observeSessionDebug(record: SessionRecord, event: SessionEvent):
   const cacheReadTokens = token(usage?.cacheReadTokens);
   const duration = token(payload.durationMs);
   const first = token(payload.timeToFirstContentMs);
-  const generationDurationMs =
+  // 「首字延迟」只在它确实落在请求前半段时才可信。部分中转/网关会把 SSE 缓冲后
+  // 一次性 flush，所有 delta 在最后才到达，于是 first 贴着 duration，差值只剩几十
+  // 毫秒——拿它当分母会算出上万 tok/s（实测库里最高 8000 t/s）。
+  // 这种样本无法还原真实生成速度，宁可留空（UI 显示 —），也不给一个假数字；
+  // 用总耗时兜底同样失真（会把思考时间算成生成时间），所以直接置空。
+  const rawGenerationMs =
     duration !== undefined && first !== undefined && duration > first ? duration - first : null;
+  const generationDurationMs =
+    rawGenerationMs !== null && duration !== undefined && rawGenerationMs >= duration * 0.1
+      ? rawGenerationMs
+      : null;
   observation.hasUnknownCacheUsage ||= inputTokens === undefined || cacheReadTokens === undefined;
   const previous = state.cache;
   const totalInputTokens = (previous?.totalInputTokens ?? 0) + (inputTokens ?? 0);

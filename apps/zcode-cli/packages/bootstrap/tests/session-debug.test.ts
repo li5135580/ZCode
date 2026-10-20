@@ -90,6 +90,30 @@ describe("session debug observation", () => {
     },
   );
 
+  it("treats a buffered stream as unknown instead of inventing a huge rate", () => {
+    // 中转把 SSE 攒完再一次性 flush：首字出现在最后 2%，差值只有 100ms。
+    // 用差值会得到 1200 tok/s 的荒谬速率，用总耗时又会把思考时间算成生成时间，
+    // 两种口径都失真，因此必须留空。
+    const target = record();
+    observeSessionDebug(
+      target,
+      event(1, { durationMs: 5000, timeToFirstContentMs: 4900, usage: { outputTokens: 120 } }),
+    );
+    const round = readSessionDebug(target).rounds[0];
+    expect(round?.generationDurationMs).toBeNull();
+    expect(round?.tokensPerSecond).toBeNull();
+  });
+
+  it("keeps the first-content delta when the stream is genuinely incremental", () => {
+    const target = record();
+    observeSessionDebug(
+      target,
+      event(1, { durationMs: 5000, timeToFirstContentMs: 2000, usage: { outputTokens: 120 } }),
+    );
+    expect(readSessionDebug(target).rounds[0]?.generationDurationMs).toBe(3000);
+    expect(readSessionDebug(target).rounds[0]?.tokensPerSecond).toBe(40);
+  });
+
   it("querying cannot resume a cold session or alter activity", () => {
     const target = { ...record(), updatedAt: 123 };
     const context = { sessions: new Map([["session-1", target]]), deps: {} };

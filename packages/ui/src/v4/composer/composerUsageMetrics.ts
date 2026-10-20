@@ -257,13 +257,25 @@ export interface TurnRateSample {
 }
 
 /**
+ * 速率的物理上限（tok/s）。
+ *
+ * 当前最快的模型也就 200–400 tok/s 量级，超过这个值一定是分子分母口径对不上
+ * （典型原因：中转把 SSE 缓冲后一次性 flush，首字时间贴着总耗时；或墙钟起点
+ * 是在轮次中途才建立的）。这类样本不能显示——宁可退回占位符，也不要给用户
+ * 一个上万 t/s 的假数字。
+ */
+export const MAX_PLAUSIBLE_TPS = 1000;
+
+/**
  * 轮次结束时算本轮平均生成速度。
  *
  * 口径与设置页 debug 面板一致：输出 tokens（含思考）÷ 生成耗时。
  * 用会话 cumulative.outputTokens 的增量而不是单次请求用量，是为了让子智能体、
  * 重试等旁路输出也计入——否则用户会看到「明明输出了很多，速率却很低」。
  *
- * 返回 null 的三种情况：没有起点、没有新增输出、耗时过短（避免除以接近 0 得到荒谬值）。
+ * 返回 null 的情况：没有起点、没有新增输出、耗时过短（避免除以接近 0 得到荒谬值），
+ * 以及算出来超出物理上限——后者说明分子分母口径对不上（典型：起点是在轮次中途
+ * 才建立的，或迟到的用量提交被算进了这一轮），宁可显示占位符也不给假数字。
  */
 export function computeTurnRate(
   baseline: TurnRateBaseline | null,
@@ -278,11 +290,11 @@ export function computeTurnRate(
   if (outputTokens <= 0 || durationMs < minimumDurationMs) {
     return null;
   }
-  return {
-    tokensPerSecond: (outputTokens * 1000) / durationMs,
-    outputTokens,
-    durationMs,
-  };
+  const tokensPerSecond = (outputTokens * 1000) / durationMs;
+  if (!Number.isFinite(tokensPerSecond) || tokensPerSecond > MAX_PLAUSIBLE_TPS) {
+    return null;
+  }
+  return { tokensPerSecond, outputTokens, durationMs };
 }
 
 // ── 逐轮明细（来自 readSessionDebug）──────────────────────────────────
@@ -340,28 +352,43 @@ export function resolveLatestTurnDetail(
   let reasoningTokens = 0;
   let generationDurationMs: number | null = null;
   let tokensPerSecond: number | null = null;
+  // 兜底速率必须用「同一批轮次」的分子和分母：只统计同时具备可信生成耗时的段。
+  // 曾经用全部轮次的输出 ÷ 部分轮次的耗时，缺耗时的段把分子抬高、分母不变，
+  // 于是短耗时的大输出被放大成上万 t/s。
+  let measuredOutputTokens = 0;
+  let measuredDurationMs = 0;
 
   for (const round of turnRounds) {
+    const roundOutput = round.usage.outputTokens ?? 0;
     inputTokens += round.usage.inputTokens ?? 0;
-    outputTokens += round.usage.outputTokens ?? 0;
+    outputTokens += roundOutput;
     cacheReadTokens += round.usage.cachedInputTokens ?? 0;
     reasoningTokens += round.usage.reasoningTokens ?? 0;
-    if (round.generationDurationMs !== null) {
-      generationDurationMs = (generationDurationMs ?? 0) + round.generationDurationMs;
+
+    // 单段速率超出物理上限说明该段的分母失真（中转缓冲、首字延迟贴着总耗时等）。
+    // 这类段既不能用来显示，也不能进兜底的分子分母——否则会把整轮速率带偏。
+    const roundRate = round.tokensPerSecond;
+    const roundDuration = round.generationDurationMs;
+    const roundPlausible = roundRate === null || roundRate <= MAX_PLAUSIBLE_TPS;
+
+    if (roundDuration !== null && roundPlausible) {
+      generationDurationMs = (generationDurationMs ?? 0) + roundDuration;
+      measuredOutputTokens += roundOutput;
+      measuredDurationMs += roundDuration;
     }
     // 多段时取最后一段的有效值——与状态条「最近一次完成请求」口径一致。
     // 最新一段缺首字延迟时 tokensPerSecond 为 null，此时保留前一段的有效值，
     // 而不是把整轮速率清空（否则用户会看到「明明在跑，速度却是 —」）。
-    if (round.tokensPerSecond !== null) {
-      tokensPerSecond = round.tokensPerSecond;
+    if (roundRate !== null && roundPlausible) {
+      tokensPerSecond = roundRate;
     }
   }
 
-  // 所有段都没有可信速率时，用本轮累计输出 ÷ 累计生成耗时兜底。
-  // 这是同一口径的聚合值，比显示占位符更有信息量。
-  if (tokensPerSecond === null && generationDurationMs !== null && generationDurationMs > 0) {
-    const fallback = (outputTokens * 1000) / generationDurationMs;
-    tokensPerSecond = Number.isFinite(fallback) ? fallback : null;
+  // 所有段都没有可信速率时，用「有耗时的那几段」的输出 ÷ 同一批段的耗时兜底。
+  // 兜底值同样要过上限校验，否则会被同一个失真的分母带偏。
+  if (tokensPerSecond === null && measuredDurationMs > 0) {
+    const fallback = (measuredOutputTokens * 1000) / measuredDurationMs;
+    tokensPerSecond = Number.isFinite(fallback) && fallback <= MAX_PLAUSIBLE_TPS ? fallback : null;
   }
 
   const cacheHitRate = inputTokens > 0 ? cacheReadTokens / inputTokens : null;
