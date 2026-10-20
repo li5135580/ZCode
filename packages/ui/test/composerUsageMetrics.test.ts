@@ -314,24 +314,26 @@ describe("composer 用量状态条计算", () => {
       expect(detail?.cacheHitRate).toBeNull();
     });
 
-    it("最新一段缺速率时保留前一段的有效值", () => {
+    it("最新一段缺速率时显示占位而不是沿用旧值", () => {
       const debug = buildDebug([
         { recordedAt: 1000, input: 100, output: 50, duration: 500, tps: 100 },
-        // 这一段缺首字延迟，tokensPerSecond 为 null
+        // 这一段缺首字延迟（缓冲流），tokensPerSecond 为 null
         { recordedAt: 2000, input: 100, output: 80, duration: 500, tps: null },
       ]);
 
-      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBe(100);
+      // 用户要求「准确优先，不准宁可显示 —」：旧段的 100 不是最近一次请求的速度，
+      // 沿用会让用户误以为当前请求也跑这么快。
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeNull();
     });
 
-    it("所有段都没有速率时用累计输出 ÷ 累计生成耗时兜底", () => {
+    it("不做跨段聚合兜底，速率只来自最近一次完成请求", () => {
       const debug = buildDebug([
         { recordedAt: 1000, input: 100, output: 100, duration: 500, tps: null },
         { recordedAt: 2000, input: 100, output: 100, duration: 500, tps: null },
       ]);
 
-      // 200 tokens / 1000ms = 200 tok/s
-      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeCloseTo(200);
+      // 曾经用 200 tokens / 1000ms 兜底出 200 t/s，但没有任何一次请求真跑出这个速度。
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeNull();
     });
 
     it("丢弃超出物理上限的速率，避免分母失真时显示上万 t/s", () => {
@@ -352,18 +354,19 @@ describe("composer 用量状态条计算", () => {
         { recordedAt: 2000, input: 100, output: 592, duration: 74, tps: 8000 },
       ]);
 
-      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBe(100);
+      // 最后一段超限被丢弃，但也不能回退到前一段（那不是最近一次请求的速度）。
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeNull();
     });
 
-    it("兜底时分子只算有耗时的那几段，避免分母缺失导致速率虚高", () => {
-      // 第 1 段没有生成耗时（缺首字延迟），输出 5000；第 2 段有耗时 1000ms，输出 100。
-      // 若用全部输出 5100 ÷ 1000ms 会得到 5100 t/s；正确口径是 100 ÷ 1000ms = 100。
+    it("分子分母缺耗时不影响速率：没有实测值就是 null", () => {
+      // 第 1 段没有生成耗时，输出 5000；第 2 段有耗时但也没实测速率。
+      // 任何形式的「输出 ÷ 耗时」聚合都不再使用。
       const debug = buildDebug([
         { recordedAt: 1000, input: 100, output: 5000, duration: null, tps: null },
         { recordedAt: 2000, input: 100, output: 100, duration: 1000, tps: null },
       ]);
 
-      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeCloseTo(100);
+      expect(resolveLatestTurnDetail(debug)?.tokensPerSecond).toBeNull();
     });
   });
 

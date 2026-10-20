@@ -2157,6 +2157,8 @@ const enUS: Record<string, string> = {
   "titleBar.menu.help.resourceManager": "Resource manager",
   "titleBar.menu.help.toggleZCodeStdioTap": "Capture agent stdio traffic",
   "titleBar.menu.help.clearAllData": "Clear all data",
+  "titleBar.menu.help.relaunch": "Restart ZCode",
+  "titleBar.menu.help.relaunchHint": "Fully quit and start again, same as closing and reopening",
 
   // Directory browser
   "directoryBrowser.errorUnavailable":

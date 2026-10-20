@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DesktopCommandIds } from "@zcode/shared";
-import { TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER } from "@zcode/shared/test-ids";
+import { TID_WORKSPACE_HELP_MENU_RELAUNCH, TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER } from "@zcode/shared/test-ids";
 
 vi.mock("@/i18n/IntlProvider.js", () => ({
   useZCodeIntl: () => ({
@@ -201,6 +201,27 @@ describe("WorkspaceHelpMenuButton", () => {
     );
   });
 
+  it("桌面端提供重启入口，点击执行 RelaunchApp", async () => {
+    await render(true);
+    const item = captured.menuItems.find(
+      (entry) => entry.testId === TID_WORKSPACE_HELP_MENU_RELAUNCH,
+    );
+    expect(item).toBeDefined();
+    await item!.onSelect?.();
+    expect(captured.executeDesktopCommand).toHaveBeenCalledExactlyOnceWith(
+      DesktopCommandIds.RelaunchApp,
+    );
+  });
+
+  it("Web 和手机远控不显示重启入口", async () => {
+    for (const isDesktop of [undefined, false]) {
+      expect(await render(isDesktop)).not.toContain("titleBar.menu.help.relaunch");
+      expect(
+        captured.menuItems.some((entry) => entry.testId === TID_WORKSPACE_HELP_MENU_RELAUNCH),
+      ).toBe(false);
+    }
+  });
+
   it("Web 和手机远控不显示桌面关于入口", async () => {
     for (const isDesktop of [undefined, false]) {
       expect(await render(isDesktop)).not.toContain("titleBar.menu.help.about");
@@ -264,11 +285,12 @@ describe("WorkspaceHelpMenuButton", () => {
               "titleBar.menu.help.exportLogs",
               "titleBar.menu.help.resourceManager",
               "titleBar.menu.help.checkForUpdates",
+              "titleBar.menu.help.relaunch",
               "titleBar.menu.help.about",
             ]
           : []),
       ]);
-      expect((html.match(/<hr/g) ?? []).length).toBe(desktop ? 1 : 0);
+      expect((html.match(/<hr/g) ?? []).length).toBe(desktop ? 2 : 0);
     }
   });
 

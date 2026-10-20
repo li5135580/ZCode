@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DesktopCommandIds } from "@zcode/shared";
 import {
+  TID_WORKSPACE_HELP_MENU_RELAUNCH,
   TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER,
   TID_WORKSPACE_HELP_MENU_TRIGGER,
 } from "@zcode/shared/test-ids";
@@ -14,6 +15,7 @@ import {
   MessageSquareIcon,
   UsersIcon,
   RefreshCwIcon,
+  RotateCwIcon,
   ShieldAlertIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge.js";
@@ -68,6 +70,12 @@ export function WorkspaceHelpMenuButton({
 
   const handleShowAbout = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.ShowAbout);
+  };
+
+  // 完整重启（prepareAppQuit + app.relaunch + app.quit），等价于手动退出再启动。
+  // 用于「改设置/换模型/装插件后需要重启才生效」的场景，省去手动退出。
+  const handleRelaunch = () => {
+    void platform.executeDesktopCommand(DesktopCommandIds.RelaunchApp);
   };
 
   return (
@@ -165,6 +173,14 @@ export function WorkspaceHelpMenuButton({
                 )}
               </DropdownMenuItem>
             ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              data-testid={TID_WORKSPACE_HELP_MENU_RELAUNCH}
+              onSelect={handleRelaunch}
+            >
+              <RotateCwIcon className="size-4" />
+              {intl.formatMessage({ id: "titleBar.menu.help.relaunch" })}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={handleShowAbout}>
               <InfoIcon className="size-4" />
               {intl.formatMessage({ id: "titleBar.menu.help.about" })}

@@ -168,9 +168,9 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
   const sessionTotals = useMemo(() => resolveSessionTotals(taskUsage, usage), [taskUsage, usage]);
   const sessionHitRate = resolveSessionCacheHitRate(sessionTotals);
 
-  // 速率优先用逐轮事实（数据库口径），退回本地推算值。
-  // 最后再过一道上限：两个来源都已各自校验，这里兜住未来新增来源的同类失真。
-  const rawRate = turnDetail?.tokensPerSecond ?? turnRate?.tokensPerSecond ?? null;
+  // 速度只认逐轮实测值（数据库口径）。墙钟估算（turnRate.tokensPerSecond）不参与：
+  // 它的基线可能晚于实际生成开始，曾算出 10619 t/s。测不准就显示占位符。
+  const rawRate = turnDetail?.tokensPerSecond ?? null;
   const effectiveRate = rawRate !== null && rawRate <= MAX_PLAUSIBLE_TPS ? rawRate : null;
   const speedTier = resolveSpeedTier(effectiveRate);
 
@@ -247,7 +247,8 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
         testId="usage-item-speed"
       >
         <Label>{intl.formatMessage({ id: "chat.composerUsage.speed" })}</Label>
-        <Value className={TIER_TEXT[speedTier]}>
+        {/* 没有实测值时用中性色占位：绿色会让「不知道」看起来像「很快」。 */}
+        <Value className={effectiveRate === null ? undefined : TIER_TEXT[speedTier]}>
           {effectiveRate === null ? placeholder : formatRate(locale, effectiveRate)}
         </Value>
         <Sub>{intl.formatMessage({ id: "chat.composerUsage.rateUnit" })}</Sub>
@@ -345,8 +346,9 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
             ) : null}
           </>
         ) : turnRate ? (
-          // 逐轮明细只存在于 agent 进程内，重启后为空；此时用本轮累计增量兜底，
-          // 至少让「本轮输出了多少、花了多久」仍然可见。
+          // 逐轮明细只存在于 agent 进程内，重启后为空；此时用本轮墙钟增量兜底。
+          // 这里只展示「输出量」和「耗时」两个可信数字，不展示速率——
+          // 墙钟速率可能因基线建立时机错位而虚高几十倍。
           <>
             <Sub>↓</Sub>
             <Value>{tokens(turnRate.outputTokens)}</Value>

@@ -251,8 +251,15 @@ export interface TurnRateBaseline {
 }
 
 export interface TurnRateSample {
+  /**
+   * 墙钟估算的速率。**只作诊断用途，不参与状态条的速度显示**：
+   * 基线是在 phase 进入 running 时建立的，若快照推送晚于实际生成开始，
+   * 增量会被压缩进极短耗时，算出上万 t/s。速度显示只认逐轮实测值。
+   */
   tokensPerSecond: number;
+  /** 本轮输出增量（实测，可信）。 */
   outputTokens: number;
+  /** 本轮墙钟耗时（可信，含排队与工具调用间隙）。 */
   durationMs: number;
 }
 
@@ -265,17 +272,15 @@ export interface TurnRateSample {
  * 一个上万 t/s 的假数字。
  */
 export const MAX_PLAUSIBLE_TPS = 1000;
-
 /**
- * 轮次结束时算本轮平均生成速度。
+ * 轮次结束时用墙钟增量算本轮输出与耗时。
  *
- * 口径与设置页 debug 面板一致：输出 tokens（含思考）÷ 生成耗时。
- * 用会话 cumulative.outputTokens 的增量而不是单次请求用量，是为了让子智能体、
- * 重试等旁路输出也计入——否则用户会看到「明明输出了很多，速率却很低」。
+ * 这两个数字（outputTokens / durationMs）是可信的，用于「逐轮明细不可用」时
+ * 的兜底展示；但其中的 tokensPerSecond 不参与速度显示——墙钟基线可能晚于
+ * 实际生成开始，会算出上万 t/s（详见 TurnRateSample 注释）。
  *
  * 返回 null 的情况：没有起点、没有新增输出、耗时过短（避免除以接近 0 得到荒谬值），
- * 以及算出来超出物理上限——后者说明分子分母口径对不上（典型：起点是在轮次中途
- * 才建立的，或迟到的用量提交被算进了这一轮），宁可显示占位符也不给假数字。
+ * 以及算出来超出物理上限（说明基线建立时机错位）。
  */
 export function computeTurnRate(
   baseline: TurnRateBaseline | null,
@@ -351,45 +356,28 @@ export function resolveLatestTurnDetail(
   let cacheReadTokens = 0;
   let reasoningTokens = 0;
   let generationDurationMs: number | null = null;
-  let tokensPerSecond: number | null = null;
-  // 兜底速率必须用「同一批轮次」的分子和分母：只统计同时具备可信生成耗时的段。
-  // 曾经用全部轮次的输出 ÷ 部分轮次的耗时，缺耗时的段把分子抬高、分母不变，
-  // 于是短耗时的大输出被放大成上万 t/s。
-  let measuredOutputTokens = 0;
-  let measuredDurationMs = 0;
 
   for (const round of turnRounds) {
-    const roundOutput = round.usage.outputTokens ?? 0;
     inputTokens += round.usage.inputTokens ?? 0;
-    outputTokens += roundOutput;
+    outputTokens += round.usage.outputTokens ?? 0;
     cacheReadTokens += round.usage.cachedInputTokens ?? 0;
     reasoningTokens += round.usage.reasoningTokens ?? 0;
-
-    // 单段速率超出物理上限说明该段的分母失真（中转缓冲、首字延迟贴着总耗时等）。
-    // 这类段既不能用来显示，也不能进兜底的分子分母——否则会把整轮速率带偏。
+    // 只累加可信的生成耗时。速率超限的段说明它的分母本身失真（缓冲型中转），
+    // 把它加进总和会让「生成耗时」显示成 0.1s 这种荒谬值。
     const roundRate = round.tokensPerSecond;
-    const roundDuration = round.generationDurationMs;
-    const roundPlausible = roundRate === null || roundRate <= MAX_PLAUSIBLE_TPS;
-
-    if (roundDuration !== null && roundPlausible) {
-      generationDurationMs = (generationDurationMs ?? 0) + roundDuration;
-      measuredOutputTokens += roundOutput;
-      measuredDurationMs += roundDuration;
-    }
-    // 多段时取最后一段的有效值——与状态条「最近一次完成请求」口径一致。
-    // 最新一段缺首字延迟时 tokensPerSecond 为 null，此时保留前一段的有效值，
-    // 而不是把整轮速率清空（否则用户会看到「明明在跑，速度却是 —」）。
-    if (roundRate !== null && roundPlausible) {
-      tokensPerSecond = roundRate;
+    const durationPlausible = roundRate === null || roundRate <= MAX_PLAUSIBLE_TPS;
+    if (round.generationDurationMs !== null && durationPlausible) {
+      generationDurationMs = (generationDurationMs ?? 0) + round.generationDurationMs;
     }
   }
 
-  // 所有段都没有可信速率时，用「有耗时的那几段」的输出 ÷ 同一批段的耗时兜底。
-  // 兜底值同样要过上限校验，否则会被同一个失真的分母带偏。
-  if (tokensPerSecond === null && measuredDurationMs > 0) {
-    const fallback = (measuredOutputTokens * 1000) / measuredDurationMs;
-    tokensPerSecond = Number.isFinite(fallback) && fallback <= MAX_PLAUSIBLE_TPS ? fallback : null;
-  }
+  // 速率只取「最近一次完成请求」的实测值，不做跨段聚合、不用本地墙钟估算。
+  // 聚合与估算都曾把速率放大几十倍（见 MAX_PLAUSIBLE_TPS 注释）；测不准就留空，
+  // 由 UI 显示占位符——用户明确要求「准确优先，不准宁可显示 —」。
+  const lastRound = turnRounds[turnRounds.length - 1];
+  const lastRate = lastRound?.tokensPerSecond ?? null;
+  const tokensPerSecond =
+    lastRate !== null && lastRate <= MAX_PLAUSIBLE_TPS ? lastRate : null;
 
   const cacheHitRate = inputTokens > 0 ? cacheReadTokens / inputTokens : null;
   return {

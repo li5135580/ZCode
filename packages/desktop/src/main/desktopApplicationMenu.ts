@@ -352,6 +352,12 @@ function buildApplicationMenuTemplate(options: {
           label: getLabel(desktopMenuMessageIds.helpExportLogs),
           click: () => void options.executeDesktopCommand(DesktopCommandIds.ExportLogs),
         },
+        {
+          // 完整重启（prepareAppQuit + app.relaunch + app.quit），等价于手动退出再启动。
+          // 用于「改设置/换模型/装插件后需要重启才生效」的场景，省去手动退出。
+          label: getLabel(desktopMenuMessageIds.helpRelaunch),
+          click: () => void options.executeDesktopCommand(DesktopCommandIds.RelaunchApp),
+        },
         { type: "separator" as const },
         {
           label: getLabel(desktopMenuMessageIds.helpClearAllData),

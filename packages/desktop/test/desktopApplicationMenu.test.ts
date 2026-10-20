@@ -45,6 +45,7 @@ vi.mock("@zcode/shared", () => ({
     CheckForUpdates: "checkForUpdates",
     OpenFeedback: "openFeedback",
     ExportLogs: "exportLogs",
+    RelaunchApp: "relaunchApp",
     ToggleDevTools: "toggleDevTools",
     OpenResourceManager: "openResourceManager",
     ToggleZCodeStdioTapDevProxy: "toggleZCodeStdioTapDevProxy",
@@ -95,6 +96,7 @@ vi.mock("@zcode/shared", () => ({
     helpFeedback: "titleBar.menu.help.feedback",
     helpExportLogs: "titleBar.menu.help.exportLogs",
     helpClearAllData: "titleBar.menu.help.clearAllData",
+    helpRelaunch: "titleBar.menu.help.relaunch",
   },
   get ZCODE_ENV() {
     return envMock.value;
@@ -387,8 +389,28 @@ describe("desktopApplicationMenu endpoint submenu", () => {
     expect(executeDesktopCommand).toHaveBeenNthCalledWith(4, "resetZoom");
   });
 
-  it("View 菜单按当前缩放档位禁用边界命令", async () => {
+  it("Help 菜单提供重启入口，等价于手动退出再启动", async () => {
     const executeDesktopCommand = vi.fn();
+    const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");
+
+    rebuildApplicationMenu({
+      currentApplicationLocale: "en-US",
+      zcodeEndpointSelection: "production",
+      executeDesktopCommand,
+    });
+
+    const template = buildFromTemplateMock.mock.calls.at(
+      -1,
+    )?.[0] as Electron.MenuItemConstructorOptions[];
+    const relaunchItem = findMenuItem(template, "titleBar.menu.help.relaunch");
+    expect(relaunchItem).toBeTruthy();
+    expect(relaunchItem?.role).toBeUndefined();
+
+    relaunchItem?.click?.({} as Electron.MenuItem, undefined, undefined);
+    expect(executeDesktopCommand).toHaveBeenCalledWith("relaunchApp");
+  });
+
+  it("View 菜单按当前缩放档位禁用边界命令", async () => {    const executeDesktopCommand = vi.fn();
     const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");
 
     rebuildApplicationMenu({

@@ -1997,6 +1997,8 @@ const zhCN: Record<string, string> = {
   "titleBar.menu.help.resourceManager": "资源管理器",
   "titleBar.menu.help.toggleZCodeStdioTap": "抓取 Agent stdio 通信",
   "titleBar.menu.help.clearAllData": "清除所有数据",
+  "titleBar.menu.help.relaunch": "重启 ZCode",
+  "titleBar.menu.help.relaunchHint": "完全退出并重新启动，等价于手动关闭后再打开",
 
   // 目录浏览
   "directoryBrowser.errorUnavailable":
