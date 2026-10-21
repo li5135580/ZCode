@@ -53,27 +53,46 @@ jobs:
           # 这里不再重新应用 patches/0NN-*.patch —— 那些改动已经在工作树里，
           # `git apply` 只会报 "already exists / patch does not apply"，让同步每次都失败。
           # patches/ 目录仅作为二开内容的存档快照，不参与同步流程。
-          #
-          # 自动合并上游代码，保留本地历史。冲突时中止并退出，
-          # 由下方 failure() 步骤创建 Issue 通知人工处理。
-          git merge upstream/main --no-edit || {
-            echo "Merge conflict with upstream"
-            git merge --abort
-            exit 1
-          }
+          if ! git merge upstream/main --no-edit; then
+            conflicts=$(git diff --name-only --diff-filter=U)
+            echo "conflicted files:"
+            echo "$conflicts"
+            # README 的「更新」列表两边都会追加条目，几乎每次同步都冲突。
+            # 二开 README 是权威版本（含二开功能说明），这类纯文档冲突自动保留我方；
+            # 任何代码文件冲突仍然中止，交给人工处理。
+            unexpected=$(printf '%s\n' "$conflicts" | grep -vE '^README(\.en)?\.md$' | sed '/^$/d')
+            if [ -n "$unexpected" ]; then
+              echo "::error::同步冲突涉及非 README 文件，需人工处理："
+              echo "$unexpected"
+              git merge --abort
+              exit 1
+            fi
+            git checkout --ours -- README.md README.en.md
+            git add README.md README.en.md
+            git commit --no-edit -m "chore: sync upstream $(git rev-parse --short upstream/main)（README 保留二开版本）"
+            echo "README 冲突已按二开版本解决，继续推送"
+          fi
 
           # 提交变更并推送（非 force，避免覆盖他人/历史提交）
           git add .
           git commit -m "chore: sync upstream $(git rev-parse --short upstream/main)" || true
           git push origin main
 
-      - name: Create issue on conflict
+      - name: Report conflict
         if: failure()
+        # Issues 可能在仓库里被关闭，此时 issues.create 会抛 HttpError，
+        # 把「同步冲突」这个真实原因掩盖成「工作流配置错误」。通知失败不该影响判定。
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const { data: repository } = await github.rest.repos.get({ owner, repo });
+            if (!repository.has_issues) {
+              core.warning('仓库未启用 Issues，跳过冲突通知；冲突详情见本次运行日志');
+              return;
+            }
             // 幂等创建 label，避免 labels 引用不存在导致 issues.create 返回 422
             try {
               await github.rest.issues.createLabel({
