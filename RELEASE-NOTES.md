@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.2-fork.17`）
+# ZCode 二开增强版（构建标签 `v3.16.2-fork.18`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,45 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.3-fork.17-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.3-fork.17-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.3-fork.17-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.3-fork.17-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.3-fork.17-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.3-fork.17-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.3-fork.18-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.3-fork.18-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.3-fork.18-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.3-fork.18-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.3-fork.18-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.3-fork.18-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.3-fork.17` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.3-fork.18` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.2`，
-> 但按 semver `3.16.3-fork.17 > 3.16.2`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.3-fork.18 > 3.16.2`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🐛 本版修复：移动端远程控制打开报「Not Found」
+
+扫码打开手机端远程控制时整页 404，白屏打不开。
+
+根因是版本号撞上了服务端的白名单。远程控制入口 `/remote/vN` 会对 `app_version`
+做**官方已发布版本**校验，实测 `zcode.z.ai`：
+
+| app_version | 结果 |
+| --- | --- |
+| 3.16.1 / 3.16.2 | 200 |
+| **3.16.3** | **404 Not Found** |
+| 3.14.1 / 3.14.2 / 3.14.4 | 200 |
+| 3.15.0 / 3.15.4 / 3.16.4 | 404 |
+
+也就是说只有官方真正发布过的版本号才放行。而二开为了满足 electron-updater 的
+semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.18` → `3.16.3-fork.18`），
+去掉 fork 后缀正是 `3.16.3`——恰好不在白名单里。
+
+现在二维码和 bootstrap 都改用**上游基线版本**（`3.16.2`）上报，设备身份与 relay
+注册仍用真实二开版本，不影响其它链路。另外，解析不出三段式版本时直接不带该参数
+（不带参数时入口正常返回 200，只有带错误值才会 404）。
+
+防复发措施：新增单测断言二维码与 bootstrap 都用基线版本（已回退验证能抓到原 bug），
+并在 CI 增加构建期校验，检查 `build-meta.json` 里的上游版本确实是三段式。
 
 ## 🔄 本版对齐上游 v3.16.2
 
