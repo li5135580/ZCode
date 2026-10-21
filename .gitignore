@@ -79,3 +79,9 @@ __pycache__/
 # lint-staged 运行期生成的临时清单（scripts/run-lint-staged-vitest.mjs），非源码。
 .lint-staged-vitest-*.json
 
+
+# 临时调试文件（CI 日志/运行查询结果）
+.j.json
+.runs.json
+.sync.log
+.jobs.json
