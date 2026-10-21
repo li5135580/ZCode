@@ -70,6 +70,7 @@ async function fixture(
     deviceMid: "desktop-mid",
     deviceName: "Desktop name",
     appVersion: "3.13.0",
+    remoteEntryAppVersion: "3.13.0",
     logger,
     featureGate: createWebRemoteControlFeatureGate(true),
     startupRestoreStorageProvider: {

@@ -162,6 +162,15 @@ interface WebRemoteControlManagerDependencies {
   deviceMid: string;
   deviceName: string;
   appVersion: string;
+  /**
+   * 上报给远程控制入口的版本号（`app_version`）。
+   *
+   * 入口 `/remote/vN` 按「官方已发布版本」白名单校验该参数，未发布的值直接返回
+   * 404「Not Found.」，手机端整页打不开。fork 为了满足 electron-updater 的 semver
+   * 比较会把版本写成 `上游 patch + 1`（如 3.16.3），那个版本上游从未发布过，
+   * 因此这里必须传上游基线版本，而不是 `appVersion`。
+   */
+  remoteEntryAppVersion: string;
   getLogin(): Promise<WebRemoteControlLogin | undefined>;
   deviceStorage: WebRemoteControlDeviceStorage;
   startupRestoreStorageProvider: {
@@ -811,12 +820,12 @@ export function createWebRemoteControlManager(dependencies: WebRemoteControlMana
   ): WebRemoteControlWindowBootstrapResult {
     return {
       windowControlSessionId: runtime.deviceSid,
-      // 必须与二维码里的 app_version 同形态：手机页面在版本不一致时会整页 replace 到
-      // 带真实版本号的 URL，而入口对 prerelease 版本返回 404，页面会白屏。
-      // relay 注册用的 meta.version 仍保留真实版本，不受此处影响。
+      // 必须与二维码里的 app_version 同形态，且都取「官方已发布版本」：手机页面在
+      // 版本不一致时会整页 replace 到带该版本的 URL，而入口对未发布版本返回 404，
+      // 页面会白屏。relay 注册用的 meta.version 仍保留真实版本，不受此处影响。
       desktopAppVersion:
-        resolveWebRemoteControlEntryAppVersion(dependencies.appVersion) ??
-        dependencies.appVersion,
+        resolveWebRemoteControlEntryAppVersion(dependencies.remoteEntryAppVersion) ??
+        dependencies.remoteEntryAppVersion,
       workspaces: getAvailableWorkspaces(runtime),
       initialViewState: getRuntimeInitialViewState(runtime),
       mobileViewState: runtime.mobileViewState,
@@ -1475,7 +1484,8 @@ export function createWebRemoteControlManager(dependencies: WebRemoteControlMana
       deviceSid,
       deviceMid: dependencies.deviceMid,
       deviceName: dependencies.deviceName,
-      appVersion: dependencies.appVersion,
+      // 入口只接受官方已发布版本，不能用 fork 的 patch+1 版本号。
+      appVersion: dependencies.remoteEntryAppVersion,
     });
   }
 

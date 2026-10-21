@@ -82,6 +82,7 @@ import {
   DEFAULT_LOCALE,
   TEST_ZCODE_ENDPOINT_ORIGIN,
   ZCODE_VERSION,
+  ZCODE_UPSTREAM_VERSION,
   buildZCodeEndpointUrls,
   resolveWebRemoteControlRelayWsUrl,
   resolveZCodeEndpointOrigin,
@@ -891,6 +892,11 @@ const armsUserIdentitySync = createArmsUserIdentitySync({
   setUser: (user) => armsRum.setConfig("user", user),
 });
 const webRemoteControlAppVersion = ZCODE_VERSION || app.getVersion();
+// 远程控制入口（/remote/vN）对 app_version 做「官方已发布版本」白名单校验。
+// fork 的构建版本是 `上游 patch + 1`（如 3.16.3），上游从未发布过，网关直接 404。
+// 入口只能上报上游基线版本；relay 注册等其它链路仍用真实版本。
+const webRemoteControlEntryAppVersion =
+  ZCODE_UPSTREAM_VERSION || webRemoteControlAppVersion;
 const defaultZCodeEndpointUrls = buildZCodeEndpointUrls(DEFAULT_ZCODE_ENDPOINT_ORIGIN, {
   appVersion: webRemoteControlAppVersion,
 });
@@ -942,6 +948,7 @@ const webRemoteControlManager = createWebRemoteControlManager({
   deviceMid,
   deviceName: hostname(),
   appVersion: webRemoteControlAppVersion,
+  remoteEntryAppVersion: webRemoteControlEntryAppVersion,
   getLogin: async () => {
     const userId = await loadRemoteControlUserId();
     const authorization = await loadRemoteControlAuthorization(userId);

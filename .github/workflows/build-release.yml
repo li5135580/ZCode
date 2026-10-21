@@ -180,6 +180,32 @@ jobs:
           done
           echo "=== Renderer verification passed ==="
 
+      - name: Verify remote control entry version
+        shell: bash
+        # 远程控制入口 /remote/vN 对 app_version 做「官方已发布版本」白名单校验：
+        # 传 3.16.3（fork 的 patch+1）会 404「Not Found.」，手机端整页打不开；
+        # 传 3.16.2（上游基线）才 200。这里校验构建产物里上报给入口的版本
+        # 确实是上游基线，而不是被 ZCODE_APP_VERSION 覆盖后的 fork 版本。
+        run: |
+          set -euo pipefail
+          meta="packages/desktop/out/metadata/build-meta.json"
+          test -s "$meta" || { echo "::error::$meta not found"; exit 1; }
+          node -e '
+            const fs = require("node:fs");
+            const meta = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const upstream = String(meta.upstreamVersion ?? "");
+            const app = String(meta.appVersion ?? "");
+            console.log("appVersion:", app);
+            console.log("upstreamVersion:", upstream);
+            if (!/^\d+\.\d+\.\d+$/.test(upstream)) {
+              console.error(
+                "::error::upstreamVersion 不是三段式版本，远程控制入口会拒绝该 app_version",
+              );
+              process.exit(1);
+            }
+            console.log("=== remote control entry version verification passed ===");
+          ' "$meta"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:

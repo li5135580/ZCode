@@ -56,6 +56,7 @@ function createManagerHarness(options?: {
     typeof createWebRemoteControlManager
   >[0]["reportRemoteUsageEvent"];
   appVersion?: string;
+  remoteEntryAppVersion?: string;
 }) {
   const sentPayloads: WebRemoteControlAppPayload[] = [];
   const logger = {
@@ -100,6 +101,7 @@ function createManagerHarness(options?: {
     deviceMid: "mid-1",
     deviceName: "MacBook",
     appVersion: options?.appVersion ?? "1.5.0",
+    remoteEntryAppVersion: options?.remoteEntryAppVersion ?? options?.appVersion ?? "1.5.0",
     getLogin: async () => ({ userId: "user", jwt: "jwt" }),
     deviceStorage: {
       load: async () => ({
@@ -272,6 +274,31 @@ describe("createWebRemoteControlManager external relay", () => {
         zcode_type: "bootstrap-response",
         requestId: "version-check",
         result: expect.objectContaining({ desktopAppVersion: "3.15.2" }),
+      }),
+    );
+    await h.manager.stop(1);
+  });
+
+  it("二维码与 bootstrap 都用上游基线版本，不用 fork 的 patch+1 版本", async () => {
+    // 实测：/remote/v4?app_version=3.16.3 → 404，而 3.16.2 → 200。
+    // fork 为了 electron-updater 的 semver 比较会把版本写成上游 patch+1，
+    // 那个版本上游从未发布，网关白名单不放行，手机端整页「Not Found」。
+    const h = createManagerHarness({
+      appVersion: "3.16.3-fork.17",
+      remoteEntryAppVersion: "3.16.2",
+    });
+    await h.manager.start(1, { workspacePath: localWorkspace.workspacePath });
+
+    const status = h.manager.getStatus(1);
+    expect(status.qrUrl).toContain("app_version=3.16.2");
+    expect(status.qrUrl).not.toContain("app_version=3.16.3");
+
+    h.deliverPayload({ zcode_type: "bootstrap-request", requestId: "version-check" });
+    expect(h.sentPayloads).toContainEqual(
+      expect.objectContaining({
+        zcode_type: "bootstrap-response",
+        requestId: "version-check",
+        result: expect.objectContaining({ desktopAppVersion: "3.16.2" }),
       }),
     );
     await h.manager.stop(1);

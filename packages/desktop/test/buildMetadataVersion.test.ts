@@ -46,4 +46,23 @@ describe("build-metadata appVersion", () => {
       }
     }
   });
+
+  it("upstreamVersion 不受 ZCODE_APP_VERSION 覆盖影响", () => {
+    // 远程控制入口按「官方已发布版本」白名单校验 app_version，fork 的 patch+1
+    // 版本（3.16.3）上游从未发布，网关会直接返回 404。所以这里必须保留基线版本。
+    const previous = process.env.ZCODE_APP_VERSION;
+    process.env.ZCODE_APP_VERSION = "3.16.3-fork.17";
+    try {
+      const metadata = collectBuildMetadata();
+      expect(metadata.appVersion).toBe("3.16.3-fork.17");
+      expect(metadata.upstreamVersion).not.toContain("fork");
+      expect(metadata.upstreamVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ZCODE_APP_VERSION;
+      } else {
+        process.env.ZCODE_APP_VERSION = previous;
+      }
+    }
+  });
 });

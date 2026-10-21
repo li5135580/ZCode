@@ -126,6 +126,10 @@ export function collectBuildMetadata() {
   return {
     // 根 package.json 的 version 必须与上游对齐，fork 版本只在构建期通过环境变量注入。
     appVersion: resolveAppVersion(rootPackageJson.version),
+    // 上游基线版本（不受 ZCODE_APP_VERSION 覆盖）。远程控制入口按「官方已发布版本」
+    // 白名单校验 app_version，而 fork 的 patch+1 版本（如 3.16.3）并不存在，
+    // 会被网关直接返回 404。因此入口只能用这个基线版本，不能用 appVersion。
+    upstreamVersion: normalizeVersion(rootPackageJson.version),
     minCompatibleVersion: normalizeVersion(
       rootPackageJson.zcodeCompatibility?.minCompatibleVersion ?? rootPackageJson.version,
     ),
@@ -147,6 +151,11 @@ export function readBuildMetadata() {
     const metadata = readJson(metadataPath);
     return {
       ...metadata,
+      // 旧缓存没有 upstreamVersion：退回从 appVersion 还原上游基线（去掉 fork 序号）。
+      upstreamVersion:
+        typeof metadata.upstreamVersion === "string" && metadata.upstreamVersion.length > 0
+          ? normalizeVersion(metadata.upstreamVersion)
+          : normalizeVersion(metadata.appVersion),
       minCompatibleVersion:
         typeof metadata.minCompatibleVersion === "string" && metadata.minCompatibleVersion.length > 0
           ? normalizeVersion(metadata.minCompatibleVersion)

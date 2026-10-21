@@ -202,6 +202,11 @@ export default defineConfig(({ mode }) => {
     server: { port: 5174, strictPort: true },
     define: {
       __ZCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
+      // 上游基线版本：远程控制入口按官方发布版本白名单校验 app_version，
+      // fork 的 patch+1 版本会被网关 404，入口只能上报本值。
+      __ZCODE_UPSTREAM_VERSION__: JSON.stringify(
+        buildMetadata.upstreamVersion ?? buildMetadata.appVersion,
+      ),
       __ZCODE_MIN_COMPATIBLE_VERSION__: JSON.stringify(buildMetadata.minCompatibleVersion),
       __ZCODE_COMMIT__: JSON.stringify(buildMetadata.buildCommitId),
       __ZCODE_BUILD_TIME__: JSON.stringify(buildMetadata.buildTime),

@@ -201,6 +201,10 @@ export function buildWebRemoteControlExternalQrUrl({
   const entryAppVersion = resolveWebRemoteControlEntryAppVersion(appVersion);
   if (entryAppVersion) {
     url.searchParams.set("app_version", entryAppVersion);
+  } else {
+    // 解析不出三段式版本时宁可不上报：入口按「官方已发布版本」白名单校验
+    // app_version，未发布的值会整页 404，而不带该参数时入口正常返回。
+    url.searchParams.delete("app_version");
   }
   return url.toString();
 }
