@@ -1,0 +1,478 @@
+{
+  "total_count": 4,
+  "jobs": [
+    {
+      "id": 119022710685,
+      "run_id": 39539171717,
+      "workflow_name": "Build and Release",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/li5135580/ZCode/actions/runs/39539171717",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVIobJc8AAAAbtk5vnQ",
+      "head_sha": "38b7dade49a5b513824e5257a30aa6501a7a1fd1",
+      "url": "https://api.github.com/repos/li5135580/ZCode/actions/jobs/119022710685",
+      "html_url": "https://github.com/li5135580/ZCode/actions/runs/39539171717/job/119022710685",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T03:32:51Z",
+      "started_at": "2026-10-21T03:32:54Z",
+      "completed_at": "2026-10-21T03:39:47Z",
+      "name": "build (ubuntu-latest, linux, x64)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T03:32:55Z",
+          "completed_at": "2026-10-21T03:32:56Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T03:32:56Z",
+          "completed_at": "2026-10-21T03:33:03Z"
+        },
+        {
+          "name": "Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T03:33:03Z",
+          "completed_at": "2026-10-21T03:33:08Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T03:33:08Z",
+          "completed_at": "2026-10-21T03:33:10Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T03:33:10Z",
+          "completed_at": "2026-10-21T03:33:50Z"
+        },
+        {
+          "name": "Print tool versions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T03:33:50Z",
+          "completed_at": "2026-10-21T03:33:51Z"
+        },
+        {
+          "name": "Resolve fork app version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T03:33:51Z",
+          "completed_at": "2026-10-21T03:33:51Z"
+        },
+        {
+          "name": "Build installer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T03:33:51Z",
+          "completed_at": "2026-10-21T03:39:33Z"
+        },
+        {
+          "name": "Normalize update manifest asset urls",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T03:39:33Z",
+          "completed_at": "2026-10-21T03:39:33Z"
+        },
+        {
+          "name": "Verify Linux update manifest points at AppImage",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-21T03:39:33Z",
+          "completed_at": "2026-10-21T03:39:33Z"
+        },
+        {
+          "name": "Verify renderer build output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T03:39:33Z",
+          "completed_at": "2026-10-21T03:39:33Z"
+        },
+        {
+          "name": "Upload artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T03:39:33Z",
+          "completed_at": "2026-10-21T03:39:45Z"
+        },
+        {
+          "name": "Post Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-21T03:39:45Z",
+          "completed_at": "2026-10-21T03:39:45Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-21T03:39:45Z",
+          "completed_at": "2026-10-21T03:39:45Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T03:39:45Z",
+          "completed_at": "2026-10-21T03:39:45Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/li5135580/ZCode/check-runs/119022710685",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000003064,
+      "runner_name": "GitHub Actions 1000003064",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119022710944,
+      "run_id": 39539171717,
+      "workflow_name": "Build and Release",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/li5135580/ZCode/actions/runs/39539171717",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVIobJc8AAAAbtk5woA",
+      "head_sha": "38b7dade49a5b513824e5257a30aa6501a7a1fd1",
+      "url": "https://api.github.com/repos/li5135580/ZCode/actions/jobs/119022710944",
+      "html_url": "https://github.com/li5135580/ZCode/actions/runs/39539171717/job/119022710944",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T03:32:52Z",
+      "started_at": "2026-10-21T03:32:54Z",
+      "completed_at": "2026-10-21T03:40:55Z",
+      "name": "build (windows-latest, win, x64)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T03:32:55Z",
+          "completed_at": "2026-10-21T03:32:56Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T03:32:56Z",
+          "completed_at": "2026-10-21T03:33:09Z"
+        },
+        {
+          "name": "Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T03:33:09Z",
+          "completed_at": "2026-10-21T03:33:18Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T03:33:18Z",
+          "completed_at": "2026-10-21T03:33:30Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T03:33:30Z",
+          "completed_at": "2026-10-21T03:34:54Z"
+        },
+        {
+          "name": "Print tool versions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T03:34:54Z",
+          "completed_at": "2026-10-21T03:34:55Z"
+        },
+        {
+          "name": "Resolve fork app version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T03:34:55Z",
+          "completed_at": "2026-10-21T03:34:55Z"
+        },
+        {
+          "name": "Build installer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T03:34:55Z",
+          "completed_at": "2026-10-21T03:40:47Z"
+        },
+        {
+          "name": "Normalize update manifest asset urls",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T03:40:47Z",
+          "completed_at": "2026-10-21T03:40:47Z"
+        },
+        {
+          "name": "Verify Linux update manifest points at AppImage",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 10,
+          "started_at": "2026-10-21T03:40:47Z",
+          "completed_at": "2026-10-21T03:40:47Z"
+        },
+        {
+          "name": "Verify renderer build output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T03:40:47Z",
+          "completed_at": "2026-10-21T03:40:47Z"
+        },
+        {
+          "name": "Upload artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T03:40:47Z",
+          "completed_at": "2026-10-21T03:40:52Z"
+        },
+        {
+          "name": "Post Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-21T03:40:52Z",
+          "completed_at": "2026-10-21T03:40:52Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-21T03:40:52Z",
+          "completed_at": "2026-10-21T03:40:53Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T03:40:53Z",
+          "completed_at": "2026-10-21T03:40:53Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/li5135580/ZCode/check-runs/119022710944",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000003065,
+      "runner_name": "GitHub Actions 1000003065",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119022710972,
+      "run_id": 39539171717,
+      "workflow_name": "Build and Release",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/li5135580/ZCode/actions/runs/39539171717",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVIobJc8AAAAbtk5wvA",
+      "head_sha": "38b7dade49a5b513824e5257a30aa6501a7a1fd1",
+      "url": "https://api.github.com/repos/li5135580/ZCode/actions/jobs/119022710972",
+      "html_url": "https://github.com/li5135580/ZCode/actions/runs/39539171717/job/119022710972",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T03:32:52Z",
+      "started_at": "2026-10-21T03:32:58Z",
+      "completed_at": "2026-10-21T03:39:36Z",
+      "name": "build (macos-latest, mac, arm64)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T03:32:58Z",
+          "completed_at": "2026-10-21T03:32:59Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T03:32:59Z",
+          "completed_at": "2026-10-21T03:33:10Z"
+        },
+        {
+          "name": "Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T03:33:10Z",
+          "completed_at": "2026-10-21T03:33:15Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T03:33:15Z",
+          "completed_at": "2026-10-21T03:33:17Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T03:33:17Z",
+          "completed_at": "2026-10-21T03:34:14Z"
+        },
+        {
+          "name": "Print tool versions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T03:34:14Z",
+          "completed_at": "2026-10-21T03:34:15Z"
+        },
+        {
+          "name": "Resolve fork app version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T03:34:15Z",
+          "completed_at": "2026-10-21T03:34:15Z"
+        },
+        {
+          "name": "Build installer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T03:34:15Z",
+          "completed_at": "2026-10-21T03:39:18Z"
+        },
+        {
+          "name": "Normalize update manifest asset urls",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-21T03:39:18Z",
+          "completed_at": "2026-10-21T03:39:18Z"
+        },
+        {
+          "name": "Verify Linux update manifest points at AppImage",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 10,
+          "started_at": "2026-10-21T03:39:18Z",
+          "completed_at": "2026-10-21T03:39:18Z"
+        },
+        {
+          "name": "Verify renderer build output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-21T03:39:18Z",
+          "completed_at": "2026-10-21T03:39:18Z"
+        },
+        {
+          "name": "Upload artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-21T03:39:18Z",
+          "completed_at": "2026-10-21T03:39:31Z"
+        },
+        {
+          "name": "Post Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-21T03:39:31Z",
+          "completed_at": "2026-10-21T03:39:31Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-21T03:39:31Z",
+          "completed_at": "2026-10-21T03:39:31Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-21T03:39:31Z",
+          "completed_at": "2026-10-21T03:39:33Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/li5135580/ZCode/check-runs/119022710972",
+      "labels": [
+        "macos-latest"
+      ],
+      "runner_id": 1000003066,
+      "runner_name": "GitHub Actions 1000003066",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119025030916,
+      "run_id": 39539171717,
+      "workflow_name": "Build and Release",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/li5135580/ZCode/actions/runs/39539171717",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVIobJc8AAAAbtnHXBA",
+      "head_sha": "38b7dade49a5b513824e5257a30aa6501a7a1fd1",
+      "url": "https://api.github.com/repos/li5135580/ZCode/actions/jobs/119025030916",
+      "html_url": "https://github.com/li5135580/ZCode/actions/runs/39539171717/job/119025030916",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-10-21T03:40:56Z",
+      "started_at": "2026-10-21T03:40:56Z",
+      "completed_at": "2026-10-21T03:40:55Z",
+      "name": "release",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/li5135580/ZCode/check-runs/119025030916",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

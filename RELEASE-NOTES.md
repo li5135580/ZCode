@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.1-fork.16`）
+# ZCode 二开增强版（构建标签 `v3.16.2-fork.17`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,47 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.2-fork.16-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.2-fork.16-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.2-fork.16-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.2-fork.16-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.2-fork.16-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.2-fork.16-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.3-fork.17-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.3-fork.17-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.3-fork.17-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.3-fork.17-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.3-fork.17-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.3-fork.17-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.2-fork.16` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
-> 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.1`，
-> 但按 semver `3.16.2-fork.16 > 3.16.1`，因此 electron-updater 能正确识别更新。
+> 产物版本号 `3.16.3-fork.17` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.2`，
+> 但按 semver `3.16.3-fork.17 > 3.16.2`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🔄 本版对齐上游 v3.16.2
+
+上游推进到 v3.16.2（361 个文件）。主要变化：
+
+- **侧边面板完整视图**：新增「进入/退出完整视图」与快捷键，侧栏面板可展开为完整视图
+- **托盘未读红点重做**：分别合成 1x(16px)/2x(32px) 表示，避免 Windows 通知区域缩放发糊
+- **工作区布局重构**：`WorkspaceShellLayout` 大幅调整，侧栏记忆与项目排序相关修复
+- **提示词编辑器与插件商店**细节修复
+
+二开增强功能全部保留：用量状态条、帮助菜单重启、子智能体多模型链、模型自动获取、
+对话多处批注、手动检查更新。
+
+## 🐛 本版修复：自动同步工作流每小时失败
+
+从 10-20 起，每小时触发的上游同步持续报错。日志显示是**两个独立缺陷叠加**：
+
+1. **README 冲突**：`README.md` / `README.en.md` 的「更新」列表两边都会追加条目，
+   几乎每次上游同步都在这两个文件冲突，导致 `git merge` 中止、同步永远不前进。
+   现在只对这两个纯文档冲突自动保留二开版本（二开 README 含功能说明，是权威版本）；
+   **任何代码文件冲突仍然中止并报错**，不会静默吞掉真实冲突。
+2. **冲突通知步骤自己也在失败**：仓库未启用 Issues，`issues.create` 抛
+   `HttpError: Issues has been disabled in this repository`，把「同步冲突」这个
+   真实原因掩盖成「工作流配置错误」。现在先查 `has_issues`，未启用时只打 warning；
+   并给该步骤加 `continue-on-error`，通知失败不再影响对同步结果的判定。
+
+本次已手动完成 v3.16.2 的合并（冲突文件仅上述两个 README），CI 三平台构建全绿。
 
 ## 🎨 本版优化：用量状态条信息密度
 
@@ -37,9 +64,8 @@
    设置入口跟随居中流排布，不再固定在右侧。
 4. **默认字号 12px**：比上一版的 14px 更紧凑；设置面板新增 10/11/12/13/14 五档可调，
    图标随字号等比缩放。
-5. **速度占位更准确**：刚重启客户端、还没产生任何请求时仍显示 `—`（这是正常状态）。
-   如果只是最新一段请求缺首字延迟，会沿用前一段的有效速率，或用本轮累计
-   `输出 ÷ 生成耗时` 兜底，不再整轮显示 `—`。
+5. **速度占位更准确**：刚重启客户端、还没产生任何请求时显示 `—`（这是正常状态）。
+   速度只认实测值，测不出来就留空——详见下一节。
 
 ## 🐛 本版修复：生成速度显示上万 t/s
 
