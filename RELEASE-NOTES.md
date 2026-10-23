@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.2-fork.18`）
+# ZCode 二开增强版（构建标签 `v3.16.2-fork.19`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,35 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.3-fork.18-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.3-fork.18-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.3-fork.18-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.3-fork.18-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.3-fork.18-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.3-fork.18-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.3-fork.19-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.3-fork.19-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.3-fork.19-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.3-fork.19-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.3-fork.19-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.3-fork.19-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.3-fork.18` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.3-fork.19` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.2`，
-> 但按 semver `3.16.3-fork.18 > 3.16.2`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.3-fork.19 > 3.16.2`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🐛 本版修复：更新弹窗看不到更新说明
+
+点开更新按钮后，弹窗里只有版本号、日期和按钮，看不到这次更新了什么——更新说明
+只能在按钮的悬停提示里读到。
+
+根因在**窗口尺寸**，不在渲染逻辑。更新状态是一个固定高度的独立窗口，高度只按
+更新状态分三档（205 / 224 / 170px），完全没有考虑更新说明。而弹窗里说明区是
+`minmax(0,1fr)` 弹性行：在 205px 的窗口里，头部（48px 图标 + 标题 + 日期）、
+上下间距和底部按钮已经占满全部高度，弹性行被压到接近 0。说明其实已经渲染进
+DOM，只是视觉上完全看不到。
+
+现在高度推导新增「有更新说明」这一档（460px），并修了两处会把它钳回去的地方：
+窗口最大高度上限原本停在进度态高度、布局同步时的 min/max 设置顺序会受旧边界影响。
+下载中仍保持紧凑高度（那时进度条才是主信息，说明会被主动隐藏）。
 
 ## 🐛 本版修复：移动端远程控制打开报「Not Found」
 
@@ -37,7 +52,7 @@
 | 3.15.0 / 3.15.4 / 3.16.4 | 404 |
 
 也就是说只有官方真正发布过的版本号才放行。而二开为了满足 electron-updater 的
-semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.18` → `3.16.3-fork.18`），
+semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.19` → `3.16.3-fork.19`），
 去掉 fork 后缀正是 `3.16.3`——恰好不在白名单里。
 
 现在二维码和 bootstrap 都改用**上游基线版本**（`3.16.2`）上报，设备身份与 relay
