@@ -108,6 +108,12 @@ import {
   syncPostUpdateReleaseNotesToWindow,
   syncReadyUpdateToWindow,
 } from "./autoUpdater.js";
+import {
+  resolveUpdateStatusWindowHeight,
+  UPDATE_STATUS_WINDOW_NOTES_HEIGHT,
+  UPDATE_STATUS_WINDOW_READY_HEIGHT,
+  UPDATE_STATUS_WINDOW_WIDTH,
+} from "./updateStatusWindowLayout.js";
 import { BroadcastHub } from "./broadcastHub.js";
 import { TaskRealtimeBus } from "./taskRealtimeBus.js";
 import { createAppLaunchGate } from "./appLaunchGate.js";
@@ -708,10 +714,6 @@ const webRemoteControlManagerRef = {
   current: null as ReturnType<typeof createWebRemoteControlManager> | null,
 };
 let updateStatusWindow: BrowserWindow | null = null;
-const UPDATE_STATUS_WINDOW_WIDTH = 512;
-const UPDATE_STATUS_WINDOW_COMPACT_HEIGHT = 205;
-const UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT = 224;
-const UPDATE_STATUS_WINDOW_READY_HEIGHT = UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT - 54;
 const UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION = { x: 10, y: 10 } as const;
 const mainSettingService = createSettingService();
 const webRemoteControlCredentialService = createCredentialService();
@@ -1667,16 +1669,6 @@ function syncUpdateStatusWindowChrome(win: BrowserWindow) {
   win.setWindowButtonPosition(UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION);
 }
 
-function resolveUpdateStatusWindowHeight(state: UpdateStatePayload) {
-  if (state.kind === "download-progress") {
-    return UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT;
-  }
-  if (state.kind === "update-downloaded") {
-    return UPDATE_STATUS_WINDOW_READY_HEIGHT;
-  }
-  return UPDATE_STATUS_WINDOW_COMPACT_HEIGHT;
-}
-
 function shouldUseUpdateStatusWindowContentSize(): boolean {
   return process.platform === "linux";
 }
@@ -1691,6 +1683,10 @@ function syncUpdateStatusWindowLayout(win: BrowserWindow) {
     ? win.getContentBounds()
     : win.getBounds();
   if (!shouldUseUpdateStatusWindowContentSize()) {
+    // 先放宽上限再收紧下限：状态切换可能是「无说明 205 → 有说明 460」，
+    // 也可能反过来。若先按目标高度收紧 max，而当前窗口比目标更高/更矮，
+    // Electron 会把窗口钳到旧边界，切换后尺寸对不上。
+    win.setMaximumSize(UPDATE_STATUS_WINDOW_WIDTH, UPDATE_STATUS_WINDOW_NOTES_HEIGHT);
     win.setMinimumSize(UPDATE_STATUS_WINDOW_WIDTH, height);
     win.setMaximumSize(UPDATE_STATUS_WINDOW_WIDTH, height);
   }
@@ -1739,7 +1735,9 @@ function openUpdateStatusWindow() {
           minWidth: UPDATE_STATUS_WINDOW_WIDTH,
           minHeight: UPDATE_STATUS_WINDOW_READY_HEIGHT,
           maxWidth: UPDATE_STATUS_WINDOW_WIDTH,
-          maxHeight: UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT,
+          // 上限必须覆盖「带更新说明」的最高档，否则 setMaximumSize 会把
+          // 说明态窗口钳回进度态高度，更新说明又会被压成不可见。
+          maxHeight: UPDATE_STATUS_WINDOW_NOTES_HEIGHT,
         }),
     resizable: false,
     minimizable: true,
