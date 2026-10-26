@@ -364,6 +364,7 @@ export function ProviderModelsSection({
   onModelCommit,
   onModelEnabledChange,
   onDeleteModel,
+  onRemoveModels,
   onAddModel,
   onReorderModelIds,
   settingsRevision = 0,
@@ -386,6 +387,8 @@ export function ProviderModelsSection({
     basedOnRevision: number,
   ) => void | Promise<void>;
   onDeleteModel: (modelId: string) => void;
+  /** 批量删除个人模型；「已下架」清理用，失败需向上抛以便保留选中项。 */
+  onRemoveModels?: (modelIds: readonly string[]) => void | Promise<void>;
   onModelEnabledChange?: (modelId: string, enabled: boolean) => void | Promise<void>;
   onAddModel: (model: ProviderSettingsFormModel) => void | Promise<void>;
   onReorderModelIds?: (modelIds: string[]) => void;
@@ -499,7 +502,13 @@ export function ProviderModelsSection({
               apiKey={apiKey}
               disabled={!apiKey.trim()}
               existingModelIds={models.map((model) => model.modelId)}
+              // 内置模型随应用版本更新自动消失，只有个人模型会在上游下架后残留，
+              // 所以「已下架」清理只针对非 builtin 的模型。
+              personalModelIds={models
+                .filter((model) => !model.builtin)
+                .map((model) => model.modelId)}
               onAddModel={onAddModel}
+              onRemoveModels={onRemoveModels}
             />
           ) : null}
           <Button

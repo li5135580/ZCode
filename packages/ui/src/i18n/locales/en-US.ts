@@ -4472,6 +4472,14 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.fetchModelsAlreadyAdded": "Added",
   "settings.modelProvider.fetchModelsAddSelected": "Add selected ({count})",
   "settings.modelProvider.fetchModelsPartialFailure": "Some models failed to add: {error}",
+  "settings.modelProvider.fetchModelsStaleTitle":
+    "{count} added models are missing from this list",
+  "settings.modelProvider.fetchModelsStaleHint":
+    "The provider may have retired these models. Deleting also removes their custom settings (context window, output limit, and so on) and cannot be undone. Select only what you are sure about.",
+  "settings.modelProvider.fetchModelsStaleIncomplete":
+    "This response looks incomplete — pagination, permission filtering, or a temporary failure can all cause it. Refresh first, then clean up.",
+  "settings.modelProvider.fetchModelsStaleRemove": "Delete selected ({count})",
+  "settings.modelProvider.fetchModelsRemoveFailed": "Failed to delete models: {error}",
   "settings.modelProvider.modelId": "Model ID",
   "settings.modelProvider.modelDisplayName": "Display name",
   "settings.modelProvider.modelApiFormat.anthropic": "Anthropic messages",

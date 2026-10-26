@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Loader2Icon, RefreshCwIcon } from "lucide-react";
+import { AlertTriangleIcon, Loader2Icon, RefreshCwIcon } from "lucide-react";
 import type { ModelConfigObject, ProviderApiType } from "@zcode/provider";
 import {
   fetchProviderModels,
@@ -11,6 +11,10 @@ import {
   TID_MODEL_PROVIDER_FETCH_MODELS_CONFIRM,
   TID_MODEL_PROVIDER_FETCH_MODELS_DIALOG,
   TID_MODEL_PROVIDER_FETCH_MODELS_ITEM,
+  TID_MODEL_PROVIDER_FETCH_MODELS_STALE_CONFIRM,
+  TID_MODEL_PROVIDER_FETCH_MODELS_STALE_INCOMPLETE,
+  TID_MODEL_PROVIDER_FETCH_MODELS_STALE_ITEM,
+  TID_MODEL_PROVIDER_FETCH_MODELS_STALE_SECTION,
   testId,
 } from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
@@ -25,6 +29,7 @@ import {
 } from "@/components/ui/dialog.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import type { ProviderSettingsFormModel } from "@/lib/providerSettingsFormTypes.js";
+import { resolveStaleModels } from "@/settings/model-provider-section/staleModelCandidates.js";
 
 /**
  * 把「获取到的模型信息」折算成可提交的稀疏 Personal Model 配置。
@@ -86,8 +91,16 @@ export interface FetchModelsButtonProps {
   disabled?: boolean;
   /** 已配置的模型 ID，用于标记「已添加」并阻止重复提交。 */
   existingModelIds: readonly string[];
+  /**
+   * 个人添加的模型 ID（不含 builtin）。
+   *
+   * 内置模型随应用版本更新自动消失，不需要清理；只有个人模型会在上游下架后残留。
+   */
+  personalModelIds?: readonly string[];
   /** 添加单个模型；复用 Provider 卡片既有的 Personal Model 保存链路。 */
   onAddModel: (model: ProviderSettingsFormModel) => void | Promise<void>;
+  /** 删除若干个人模型；不传时不展示「已下架」清理入口。 */
+  onRemoveModels?: (modelIds: readonly string[]) => void | Promise<void>;
 }
 
 /**
@@ -102,15 +115,19 @@ export function FetchModelsButton({
   apiKey,
   disabled = false,
   existingModelIds,
+  personalModelIds,
   onAddModel,
+  onRemoveModels,
 }: FetchModelsButtonProps) {
   const { intl } = useZCodeIntl();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<FetchedModelInfo[]>([]);
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+  const [removalSelectedIds, setRemovalSelectedIds] = useState<readonly string[]>([]);
   // 用户可能连续点开弹窗；用代数令牌丢弃过期响应，避免旧结果覆盖新一轮列表。
   const requestGenerationRef = useRef(0);
   const addingRef = useRef(false);
@@ -118,6 +135,20 @@ export function FetchModelsButton({
   const selectableModels = useMemo(
     () => models.filter((model) => !existingIdSet.has(model.modelId)),
     [models, existingIdSet],
+  );
+  // 「已下架」候选：个人添加、但本次获取没返回的模型。默认不勾选，必须用户显式确认。
+  const staleModels = useMemo(
+    () =>
+      resolveStaleModels({
+        fetchedModels: models,
+        personalModelIds: personalModelIds ?? [],
+      }),
+    [models, personalModelIds],
+  );
+  // 模型被删掉后候选会自动消失；这里再夹一层，避免残留的选中项指向已删除的模型。
+  const removableSelectedIds = useMemo(
+    () => removalSelectedIds.filter((modelId) => staleModels.modelIds.includes(modelId)),
+    [removalSelectedIds, staleModels.modelIds],
   );
 
   const loadModels = useCallback(async () => {
@@ -133,11 +164,13 @@ export function FetchModelsButton({
       if (!result.success) {
         setModels([]);
         setSelectedIds([]);
+        setRemovalSelectedIds([]);
         setError(result.error ?? intl.formatMessage({ id: "settings.modelProvider.fetchModelsFailed" }));
         return;
       }
       setModels(result.models);
       setSelectedIds([]);
+      setRemovalSelectedIds([]);
       if (result.models.length === 0) {
         // 内置兜底路径返回成功但列表为空（error 字段携带内部说明），
         // 这里只给用户可执行的提示，不把内部英文文案直接抛到界面上。
@@ -149,6 +182,7 @@ export function FetchModelsButton({
       if (requestGenerationRef.current !== generation) return;
       setModels([]);
       setSelectedIds([]);
+      setRemovalSelectedIds([]);
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       if (requestGenerationRef.current === generation) setLoading(false);
@@ -157,20 +191,21 @@ export function FetchModelsButton({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      // 添加过程中关闭会让逐个提交的循环失去可见反馈，等待本次提交结束再结束弹窗。
-      if (addingRef.current) return;
+      // 添加/删除过程中关闭会让逐个提交的循环失去可见反馈，等待本次提交结束再结束弹窗。
+      if (addingRef.current || removing) return;
       setOpen(next);
       if (!next) {
         requestGenerationRef.current += 1;
         setModels([]);
         setSelectedIds([]);
+        setRemovalSelectedIds([]);
         setError(null);
         setLoading(false);
         return;
       }
       void loadModels();
     },
-    [loadModels],
+    [loadModels, removing],
   );
 
   const toggleModel = (modelId: string) => {
@@ -181,8 +216,42 @@ export function FetchModelsButton({
     );
   };
 
+  const toggleRemovalModel = (modelId: string) => {
+    setRemovalSelectedIds((current) =>
+      current.includes(modelId)
+        ? current.filter((id) => id !== modelId)
+        : [...current, modelId],
+    );
+  };
+
   const allSelected =
     selectableModels.length > 0 && selectedIds.length === selectableModels.length;
+  const allRemovalSelected =
+    staleModels.modelIds.length > 0 &&
+    removableSelectedIds.length === staleModels.modelIds.length;
+
+  const confirmRemove = useCallback(async () => {
+    if (removing || !onRemoveModels) return;
+    const targets = [...removableSelectedIds];
+    if (targets.length === 0) return;
+    setRemoving(true);
+    setError(null);
+    try {
+      await onRemoveModels(targets);
+      // 删除后 personalModelIds 会随 Settings View 刷新而收缩，
+      // 候选列表随之变短；这里清空选中，避免残留指向已删除的模型。
+      setRemovalSelectedIds([]);
+    } catch (caught) {
+      setError(
+        intl.formatMessage(
+          { id: "settings.modelProvider.fetchModelsRemoveFailed" },
+          { error: caught instanceof Error ? caught.message : String(caught) },
+        ),
+      );
+    } finally {
+      setRemoving(false);
+    }
+  }, [intl, onRemoveModels, removableSelectedIds, removing]);
 
   const confirmAdd = useCallback(async () => {
     if (addingRef.current) return;
@@ -245,7 +314,7 @@ export function FetchModelsButton({
             {intl.formatMessage({ id: "settings.modelProvider.fetchModelsDescription" })}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto" inert={adding}>
+        <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto" inert={adding || removing}>
           <div className="flex items-center justify-between gap-3">
             <span className="text-ui-base text-foreground-subtle">
               {loading
@@ -325,6 +394,97 @@ export function FetchModelsButton({
               })}
             </ul>
           )}
+          {staleModels.available && onRemoveModels ? (
+            // 「已下架」候选：个人添加、但本次获取没返回的模型。
+            // 默认不勾选——获取结果不一定完整（分页、权限过滤、临时故障），
+            // 自动删除会连带丢掉用户手调的 contextWindow 等个人参数。
+            <section
+              data-testid={TID_MODEL_PROVIDER_FETCH_MODELS_STALE_SECTION}
+              className="space-y-2 rounded-lg border border-warning/30 bg-warning/5 p-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangleIcon
+                  className="mt-0.5 size-4 shrink-0 text-warning"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="text-ui-base font-medium text-foreground">
+                    {intl.formatMessage(
+                      { id: "settings.modelProvider.fetchModelsStaleTitle" },
+                      { count: staleModels.modelIds.length },
+                    )}
+                  </div>
+                  <p className="text-ui-sm leading-4 text-foreground-subtle">
+                    {intl.formatMessage({ id: "settings.modelProvider.fetchModelsStaleHint" })}
+                  </p>
+                  {staleModels.looksIncomplete ? (
+                    <p
+                      data-testid={TID_MODEL_PROVIDER_FETCH_MODELS_STALE_INCOMPLETE}
+                      className="text-ui-sm leading-4 text-warning"
+                    >
+                      {intl.formatMessage({
+                        id: "settings.modelProvider.fetchModelsStaleIncomplete",
+                      })}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <ul className="overflow-hidden rounded-lg border border-input-border bg-input">
+                {staleModels.modelIds.map((modelId) => (
+                  <li
+                    key={modelId}
+                    data-testid={testId(TID_MODEL_PROVIDER_FETCH_MODELS_STALE_ITEM, modelId)}
+                    className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                  >
+                    <Checkbox
+                      checked={removableSelectedIds.includes(modelId)}
+                      disabled={removing}
+                      aria-label={modelId}
+                      onCheckedChange={() => toggleRemovalModel(modelId)}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-mono text-ui-base">
+                      {modelId}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={removing}
+                  onClick={() =>
+                    setRemovalSelectedIds(
+                      allRemovalSelected ? [] : [...staleModels.modelIds],
+                    )
+                  }
+                >
+                  {intl.formatMessage({
+                    id: allRemovalSelected
+                      ? "settings.modelProvider.fetchModelsClearSelection"
+                      : "settings.modelProvider.fetchModelsSelectAll",
+                  })}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  data-testid={TID_MODEL_PROVIDER_FETCH_MODELS_STALE_CONFIRM}
+                  disabled={removing || removableSelectedIds.length === 0}
+                  onClick={() => void confirmRemove()}
+                >
+                  {removing ? (
+                    <Loader2Icon className="animate-spin" aria-hidden="true" />
+                  ) : null}
+                  {intl.formatMessage(
+                    { id: "settings.modelProvider.fetchModelsStaleRemove" },
+                    { count: removableSelectedIds.length },
+                  )}
+                </Button>
+              </div>
+            </section>
+          ) : null}
           {error ? (
             <p role="alert" className="text-ui-sm text-destructive">
               {error}
@@ -335,7 +495,7 @@ export function FetchModelsButton({
           <Button
             type="button"
             variant="ghost"
-            disabled={adding}
+            disabled={adding || removing}
             onClick={() => handleOpenChange(false)}
           >
             {intl.formatMessage({ id: "common.cancel" })}
@@ -343,7 +503,7 @@ export function FetchModelsButton({
           <Button
             type="button"
             data-testid={TID_MODEL_PROVIDER_FETCH_MODELS_CONFIRM}
-            disabled={adding || loading || selectedIds.length === 0}
+            disabled={adding || removing || loading || selectedIds.length === 0}
             onClick={() => void confirmAdd()}
           >
             {adding ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}

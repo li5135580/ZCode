@@ -4180,6 +4180,13 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.fetchModelsAlreadyAdded": "已添加",
   "settings.modelProvider.fetchModelsAddSelected": "添加所选（{count}）",
   "settings.modelProvider.fetchModelsPartialFailure": "部分模型添加失败：{error}",
+  "settings.modelProvider.fetchModelsStaleTitle": "{count} 个已添加的模型不在本次列表中",
+  "settings.modelProvider.fetchModelsStaleHint":
+    "供应商可能已下架这些模型。删除会同时移除它们的自定义参数（上下文窗口、输出上限等），且无法撤销。请确认后再勾选。",
+  "settings.modelProvider.fetchModelsStaleIncomplete":
+    "本次返回的模型明显偏少，可能是分页、权限过滤或临时故障。建议先重新获取确认，再清理。",
+  "settings.modelProvider.fetchModelsStaleRemove": "删除所选（{count}）",
+  "settings.modelProvider.fetchModelsRemoveFailed": "删除模型失败：{error}",
   "settings.modelProvider.modelId": "模型 ID",
   "settings.modelProvider.modelDisplayName": "显示名称",
   "settings.modelProvider.modelApiFormat.anthropic": "Anthropic Messages",

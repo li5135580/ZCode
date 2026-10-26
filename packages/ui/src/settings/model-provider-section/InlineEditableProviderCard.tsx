@@ -695,6 +695,33 @@ export function InlineEditableProviderCard({
     [models, onDeletePersonalModel, provider.providerId, runSaveOperation],
   );
 
+  /**
+   * 批量删除个人模型（「已下架」清理用）。
+   *
+   * 与单条删除的区别：必须把失败向上抛，让清理分区保留选中项并提示用户重试。
+   * 单条删除走的是行内操作，失败只需要 toast。
+   */
+  const handleRemoveModels = useCallback(
+    async (modelIds: readonly string[]) => {
+      const removable = modelIds.filter((modelId) =>
+        models.some((model) => model.modelId === modelId && !model.builtin),
+      );
+      if (removable.length === 0) return;
+      if (!onDeletePersonalModel) {
+        throw new Error("当前设置入口未装配 Personal Model 删除能力");
+      }
+      for (const modelId of removable) {
+        await runSaveOperation(
+          async () => {
+            await onDeletePersonalModel(provider.providerId, modelId);
+          },
+          { modelId, operation: "delete" },
+        );
+      }
+    },
+    [models, onDeletePersonalModel, provider.providerId, runSaveOperation],
+  );
+
   const handleModelEnabledChange = useCallback(
     async (modelId: string, enabled: boolean) => {
       if (!onSetPersonalModelEnabled) throw new Error("当前设置入口未装配 Model 启停能力");
@@ -857,6 +884,7 @@ export function InlineEditableProviderCard({
           onModelCommit={handleModelCommit}
           onModelEnabledChange={handleModelEnabledChange}
           onDeleteModel={handleDeleteModel}
+          onRemoveModels={handleRemoveModels}
           onAddModel={handleAddModel}
           onReorderModelIds={onReorderModelIds ? handleReorderModelIds : undefined}
           settingsRevision={settingsRevision ?? 0}

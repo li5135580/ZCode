@@ -526,6 +526,18 @@ export const TID_MODEL_PROVIDER_FETCH_MODELS_DIALOG = "model-provider-fetch-mode
 export const TID_MODEL_PROVIDER_FETCH_MODELS_ITEM = "model-provider-fetch-models-item";
 /** 模型供应商「获取模型列表」弹窗确认添加按钮 */
 export const TID_MODEL_PROVIDER_FETCH_MODELS_CONFIRM = "model-provider-fetch-models-confirm";
+/** 「获取模型列表」弹窗中「已下架」清理分区 */
+export const TID_MODEL_PROVIDER_FETCH_MODELS_STALE_SECTION =
+  "model-provider-fetch-models-stale-section";
+/** 「已下架」分区中的模型条目（动态后缀为模型 ID） */
+export const TID_MODEL_PROVIDER_FETCH_MODELS_STALE_ITEM =
+  "model-provider-fetch-models-stale-item";
+/** 「已下架」分区的删除确认按钮 */
+export const TID_MODEL_PROVIDER_FETCH_MODELS_STALE_CONFIRM =
+  "model-provider-fetch-models-stale-confirm";
+/** 「已下架」分区中「结果可能不完整」的警示 */
+export const TID_MODEL_PROVIDER_FETCH_MODELS_STALE_INCOMPLETE =
+  "model-provider-fetch-models-stale-incomplete";
 
 // Chat Toolbar
 /** 聊天工具栏模型选择按钮 */
