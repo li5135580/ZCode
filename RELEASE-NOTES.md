@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.2-fork.19`）
+# ZCode 二开增强版（构建标签 `v3.16.2-fork.20`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,46 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.3-fork.19-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.3-fork.19-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.3-fork.19-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.3-fork.19-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.3-fork.19-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.3-fork.19-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.16.3-fork.20-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.16.3-fork.20-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.16.3-fork.20-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.16.3-fork.20-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.16.3-fork.20-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.16.3-fork.20-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.3-fork.19` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 产物版本号 `3.16.3-fork.20` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
 > 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.2`，
-> 但按 semver `3.16.3-fork.19 > 3.16.2`，因此 electron-updater 能正确识别更新。
+> 但按 semver `3.16.3-fork.20 > 3.16.2`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🆕 本版新增：清理已下架的模型
+
+供应商下架模型后，之前「获取模型列表」添加的模型会一直留在列表里，没有任何清理入口。
+
+原因在于模型有两种来源，行为不同：**内置模型**（供应商模板带出来的）随应用版本更新
+自动消失，不用管；**个人模型**（获取时添加或手动添加的）存在个人配置里，上游下架后
+会永久残留。
+
+现在「获取模型列表」弹窗底部新增「已下架」分区，列出「个人添加、但本次获取没返回」
+的模型。默认**不勾选**，需要用户主动勾选后点「删除所选」。
+
+没有做成自动同步，是因为有三个风险无法在代码层面消除：
+
+1. **Anthropic 分支没有真实模型列表**。拿不到内置配置时它会返回 4 条硬编码的
+   Claude 模型，拿这个结果做「不在列表就删」会把用户添加的其它模型全部误删。
+2. **`/models` 不保证返回完整清单**。分页、按 API Key 权限过滤、临时故障都会让
+   某次响应只包含子集。
+3. **删除不可逆**。个人模型上挂着用户手调的上下文窗口、输出上限等参数，删掉就没了，
+   而这些往往正是为了解决上游元数据不准才设的。
+
+因此加了一道来源闸门：只有本次结果里**所有**条目都来自真实 API 时才提供清理入口；
+内置配置匹配或硬编码兜底的结果一律不展示。另外，缺失过半时会额外警示「本次返回
+可能不完整」，建议先重新获取确认。
+
+删除失败会保留勾选并显示具体错误，方便直接重试。
 
 ## 🐛 本版修复：更新弹窗看不到更新说明
 
@@ -52,7 +78,7 @@ DOM，只是视觉上完全看不到。
 | 3.15.0 / 3.15.4 / 3.16.4 | 404 |
 
 也就是说只有官方真正发布过的版本号才放行。而二开为了满足 electron-updater 的
-semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.19` → `3.16.3-fork.19`），
+semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.20` → `3.16.3-fork.20`），
 去掉 fork 后缀正是 `3.16.3`——恰好不在白名单里。
 
 现在二维码和 bootstrap 都改用**上游基线版本**（`3.16.2`）上报，设备身份与 relay
