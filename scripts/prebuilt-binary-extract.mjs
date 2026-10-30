@@ -14,25 +14,36 @@ import process from "node:process";
 import { runCommand } from "./spawn-command.mjs";
 
 // Bugfix: Windows GNU tar（Git Bash）会把绝对路径里的盘符冒号（C:）当成远程主机名，
-// 反斜杠路径也会被 MSYS 参数转换破坏。tar 参数统一转正斜杠，归档路径优先改用
+// 反斜杠路径也会被 MSYS 参数转换破坏。tar 参数统一转正斜杠，路径优先改用
 // 相对 cwd 的形式避开盘符冒号；对 bsdtar 与 Linux/macOS CI 无影响。
 function toTarPosixPath(pathValue) {
   return pathValue.replaceAll("\\", "/");
 }
 
-function resolveTarArchiveArg(archivePath, cwd) {
+/**
+ * 把路径折算成 tar 可安全接受的参数形式。
+ *
+ * Windows 的 GNU tar 会把 `C:/...` 里的冒号当成远程主机名，报
+ * `Cannot connect to C: resolve failed`；`-C` 的目标目录同样会中招。
+ * 因此只要目标与 cwd 同盘，就改用相对路径。
+ */
+function resolveTarPathArg(targetPath, cwd) {
   if (process.platform === "win32") {
     try {
-      const relativeArchivePath = relative(cwd, archivePath);
-      if (relativeArchivePath && !relativeArchivePath.startsWith("..")) {
-        return toTarPosixPath(relativeArchivePath);
+      const relativePath = relative(cwd, targetPath);
+      if (relativePath && !relativePath.startsWith("..")) {
+        return toTarPosixPath(relativePath);
       }
     } catch {
       // 跨盘符时 relative 会抛错，退回正斜杠绝对路径（bsdtar 可用）。
     }
   }
 
-  return toTarPosixPath(archivePath);
+  return toTarPosixPath(targetPath);
+}
+
+function resolveTarArchiveArg(archivePath, cwd) {
+  return resolveTarPathArg(archivePath, cwd);
 }
 
 export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cwd }) {
@@ -51,6 +62,26 @@ export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cw
     }
 
     runCommand("unzip", ["-q", archivePath, "-d", extractDir], { cwd });
+    return;
+  }
+
+  // Windows 的 GNU tar 会把路径里的盘符冒号当成远程主机名（`D:/...` 被解释成
+  // 主机 D 上的路径），报 `Cannot connect to D: resolve failed`。`--force-local`
+  // 专门关闭这一解释；它是全局选项，必须出现在归档路径之前。
+  // 注意 CI 上仓库在 D 盘、临时目录在 C 盘，跨盘符无法靠相对路径规避。
+  if (process.platform === "win32") {
+    runCommand(
+      "tar",
+      [
+        // 全局选项，必须排在 -xzf 之前：紧跟 -f 会被当作归档文件名。
+        "--force-local",
+        "-xzf",
+        toTarPosixPath(archivePath),
+        "-C",
+        toTarPosixPath(extractDir),
+      ],
+      { cwd: cwd ?? process.cwd() },
+    );
     return;
   }
 

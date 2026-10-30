@@ -9,6 +9,7 @@ overrides:
   electron-to-chromium: 1.5.452
   react: 19.2.7
   react-dom: 19.2.7
+  react-scan>esbuild: 0.27.7
 
 patchedDependencies:
   '@ai-sdk/anthropic@3.0.81':
@@ -11455,7 +11456,7 @@ packages:
     resolution: {integrity: sha512-KRlq734yN6q/f2CZmZi9CWHuiqSzoLhPFLtcJOL6XM4lR54myyFcY81pG9QOwj+eBC1hIHm5n+Ntbtqiilu8Rg==}
     hasBin: true
     peerDependencies:
-      esbuild: '>=0.18.0'
+      esbuild: 0.27.7
       react: 19.2.7
       react-dom: 19.2.7
     peerDependenciesMeta:
