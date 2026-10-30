@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.16.2-fork.20`）
+# ZCode 二开增强版（构建标签 `v3.17.1-fork.21`）
 
 ## 📦 发布内容
 
@@ -7,22 +7,78 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.16.3-fork.20-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.16.3-fork.20-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.16.3-fork.20-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.16.3-fork.20-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.16.3-fork.20-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.16.3-fork.20-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.17.2-fork.21-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.17.2-fork.21-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.17.2-fork.21-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.17.2-fork.21-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.17.2-fork.21-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.17.2-fork.21-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
-> 产物版本号 `3.16.3-fork.20` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
-> 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.16.2`，
-> 但按 semver `3.16.3-fork.20 > 3.16.2`，因此 electron-updater 能正确识别更新。
+> 产物版本号 `3.17.2-fork.21` 由**构建期注入**（`scripts/ci/fork-release-version.mjs`）：
+> 取 tag 的 base 版本 patch + 1，保留 fork 序号。仓库 `package.json` 与上游对齐为 `3.17.1`，
+> 但按 semver `3.17.2-fork.21 > 3.17.1`，因此 electron-updater 能正确识别更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
 
-## 🆕 本版新增：清理已下架的模型
+## 🔄 本版对齐上游 v3.17.1
+
+上游从 v3.16.2 推进到 v3.17.1，涉及 5307 个文件，是本项目目前最大的一次对齐。
+
+主要变化：侧边面板完整视图、子智能体模型目录状态（`modelCatalogStatus`）、
+Windows 更新包 Authenticode 签名校验、正式包忽略调试更新源、
+App 业务单测退役（改为工程测试白名单）。
+
+**合并冲突 19 处**，处理原则是「二开能力优先、上游改进照收」：
+
+- `SubagentsSection.tsx` 上游完全重写且不含模型链功能，以二开版本为基底合并，
+  保留全部子智能体多模型链能力，同时吸收上游新增的远端工作区子代理刷新
+  与模型目录状态机。
+- `zcode-builtin.json` 取上游 revision 43 与 83 条规则，二开独有的 5 条变体规则
+  追加到末尾（共 88 条）。
+- 帮助菜单同时保留二开的「重启 ZCode」与上游新增的「复制设备 ID」。
+- 13 个测试文件上游已删除（App 单测退役），二开侧同步删除。
+
+**上游两处安全加固会直接影响二开，已做适配**：
+
+1. `quitAndInstall` 前强制校验 Windows 安装包 Authenticode 签名。二开构建没有证书，
+   强校验会让每次自动更新在安装前被拒。新增构建期开关 `ZCODE_CODE_SIGNING`：
+   有证书的构建保持上游强校验，无证书的构建跳过并记录日志。
+2. 正式包忽略命令行与环境变量提供的调试更新源。二开的默认更新清单本就指向
+   自己的 GitHub Releases，且清单提供器仍会读取 `ZCODE_UPDATE_FEED_URL`，
+   更新链路不受影响。
+
+## 🐛 本版修复：构建失败（Windows 解压 + Linux 依赖安装）
+
+对齐 v3.17.1 后 CI 的 Windows 与 Linux 构建双双失败（macOS 成功）。两个独立根因：
+
+1. **Windows**：解压内置 npm 归档时用了 `tar -xzf <D盘绝对路径> -C <C盘绝对路径>`。
+   Windows 的 GNU tar 会把路径里的盘符冒号当成远程主机名，报
+   `Cannot connect to D: resolve failed`。CI 上仓库在 D 盘、临时目录在 C 盘，
+   跨盘符无法靠相对路径规避。改用 `tar --force-local -xzf ... -C ...`
+   （该选项是全局选项，必须排在 `-xzf` 之前，紧跟 `-f` 会被当作归档文件名）。
+   已用 GNU tar 1.35 实测：同盘、跨盘符、含嵌套目录均能正确解出。
+
+2. **Linux**：依赖安装报
+   `ERR_PNPM_ENOENT rename '.../react-scan/node_modules/_tmp_*' -> '.../esbuild'`。
+   根因是 pnpm 10.x 的 `hardLinkDir` 用「先暂存再整体 rename 替换目标目录」，
+   并发下会与同级暂存目录互相踩踏（上游 issue #12880，仅在 pnpm 11.25+ 修复）。
+   触发条件是本次新引入的 `react-scan`：它的 esbuild 是 optional peer（>=0.18.0），
+   而根提升的是 0.25.12，于是 react-scan 下被装出一份嵌套 esbuild 0.27.7，
+   正好是会被整体 rename 替换的那种目标目录。连续两次重试都失败在同一位置，
+   确认不是偶发。
+
+   升级 pnpm 到 11 不可行：pnpm 11 不再读取 `package.json` 的 `pnpm` 字段，
+   加 `--frozen-lockfile` 会直接报 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`
+   （已实测），等于丢掉全部 overrides 与 patchedDependencies。
+   改为消除触发条件：新增 override `react-scan>esbuild: 0.27.7`，
+   让 react-scan 复用根提升的同一版本，不再产生嵌套副本。
+   lockfile 仅变动 2 行，overrides 与 patchedDependencies 完整保留。
+
+修复后三平台构建全部通过。
+
+## 🆕 清理已下架的模型
 
 供应商下架模型后，之前「获取模型列表」添加的模型会一直留在列表里，没有任何清理入口。
 
@@ -72,25 +128,25 @@ DOM，只是视觉上完全看不到。
 
 | app_version | 结果 |
 | --- | --- |
-| 3.16.1 / 3.16.2 | 200 |
+| 3.16.1 / 3.17.1 | 200 |
 | **3.16.3** | **404 Not Found** |
 | 3.14.1 / 3.14.2 / 3.14.4 | 200 |
 | 3.15.0 / 3.15.4 / 3.16.4 | 404 |
 
 也就是说只有官方真正发布过的版本号才放行。而二开为了满足 electron-updater 的
-semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.20` → `3.16.3-fork.20`），
+semver 比较，构建版本是「上游 patch + 1」（tag `v3.17.1-fork.21` → `3.17.2-fork.21`），
 去掉 fork 后缀正是 `3.16.3`——恰好不在白名单里。
 
-现在二维码和 bootstrap 都改用**上游基线版本**（`3.16.2`）上报，设备身份与 relay
+现在二维码和 bootstrap 都改用**上游基线版本**（`3.17.1`）上报，设备身份与 relay
 注册仍用真实二开版本，不影响其它链路。另外，解析不出三段式版本时直接不带该参数
 （不带参数时入口正常返回 200，只有带错误值才会 404）。
 
 防复发措施：新增单测断言二维码与 bootstrap 都用基线版本（已回退验证能抓到原 bug），
 并在 CI 增加构建期校验，检查 `build-meta.json` 里的上游版本确实是三段式。
 
-## 🔄 本版对齐上游 v3.16.2
+## 🔄 本版对齐上游 v3.17.1
 
-上游推进到 v3.16.2（361 个文件）。主要变化：
+上游推进到 v3.17.1（361 个文件）。主要变化：
 
 - **侧边面板完整视图**：新增「进入/退出完整视图」与快捷键，侧栏面板可展开为完整视图
 - **托盘未读红点重做**：分别合成 1x(16px)/2x(32px) 表示，避免 Windows 通知区域缩放发糊
@@ -113,7 +169,7 @@ semver 比较，构建版本是「上游 patch + 1」（tag `v3.16.2-fork.20` �
    真实原因掩盖成「工作流配置错误」。现在先查 `has_issues`，未启用时只打 warning；
    并给该步骤加 `continue-on-error`，通知失败不再影响对同步结果的判定。
 
-本次已手动完成 v3.16.2 的合并（冲突文件仅上述两个 README），CI 三平台构建全绿。
+本次已手动完成 v3.17.1 的合并（冲突文件仅上述两个 README），CI 三平台构建全绿。
 
 ## 🎨 本版优化：用量状态条信息密度
 
