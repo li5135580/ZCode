@@ -184,6 +184,7 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 
 ## Updates
 
+- 2026-10-30: Synced to upstream v3.17.1.
 - 2026-10-21: Synced to upstream v3.16.2; added a "Restart ZCode" entry to the Help menu; the
   usage status bar now only shows measured generation speed (shows `—` when it cannot be
   measured), fixing a distortion that previously reported tens of thousands of tok/s.
@@ -199,7 +200,6 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 - 2026-10-17: Fixed "fetch model list" writing a wrong context window size (glm-5.3 was
   recorded as 200k while it is actually 1M), and fixed the upstream sync workflow failing
   every hour.
-- 2026-10-16: Updated to ZCode v3.16.1.
 - 2026-10-14: Enhanced version released, adding subagent multi-model chain, automatic model fetching, GitHub Actions auto sync, and more.
 - 2026-10-10: Updated to ZCode v3.15.1.
 - 2026-9-23: Updated to ZCode v3.14.3.

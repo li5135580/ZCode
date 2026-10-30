@@ -44,6 +44,11 @@ export async function resolveBuildTimeConfig(
     autoUpdateEnabled: ENABLED_VALUES.has(
       pickValue(env, defaults, "ZCODE_AUTO_UPDATE").toLowerCase(),
     ),
+    // Windows 代码签名开关。上游在 quitAndInstall 前强制校验安装包 Authenticode
+    // 签名，未签名的二开构建会让每次自动更新在安装前被拒；由构建期开关裁决。
+    codeSigningEnabled: ENABLED_VALUES.has(
+      pickValue(env, defaults, "ZCODE_CODE_SIGNING").toLowerCase(),
+    ),
   };
 }
 
@@ -52,5 +57,6 @@ export function createBuildTimeConfigDefines(config) {
     __ZCODE_ARMS_RUM_ENDPOINT__: JSON.stringify(config.armsRumEndpoint),
     __ZCODE_TELEMETRY_REPORT_ENDPOINT__: JSON.stringify(config.telemetryReportEndpoint),
     __ZCODE_AUTO_UPDATE_ENABLED__: JSON.stringify(config.autoUpdateEnabled),
+    __ZCODE_CODE_SIGNING_ENABLED__: JSON.stringify(config.codeSigningEnabled),
   };
 }

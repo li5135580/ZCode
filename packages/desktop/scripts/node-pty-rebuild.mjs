@@ -5,6 +5,7 @@ import { dirname, join, normalize, posix as posixPath, resolve, sep } from "node
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { ensureElectronRuntime } from "./ensure-electron-runtime.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -136,6 +137,7 @@ function hasPrebuildFallback({ platform, arch, nodePtyRoot }) {
 }
 
 export async function main() {
+  await ensureElectronRuntime();
   const decision = await resolveNodePtyRebuildDecision();
 
   if (!decision.shouldRebuild) {

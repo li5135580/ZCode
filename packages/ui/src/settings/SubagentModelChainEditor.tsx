@@ -8,7 +8,7 @@
  *
  * 说明：真实的 ModelConfigSelect 是模型目录驱动的下拉菜单（modelGroups / normalizedValue /
  * triggerLabel / onValueChange），没有 value/onChange/placeholder 的受控表单 API；
- * 因此本组件额外接收模型目录数据（modelGroups、modelSelectionView、modelSelectionLoading），
+ * 因此本组件额外接收模型目录数据（modelGroups、modelSelectionView、modelCatalogStatus），
  * 与 SubagentsSection 的 SubagentForm 保持同一套选型接线。
  */
 import { useCallback, useMemo, type ChangeEvent, type CSSProperties } from "react";
@@ -48,6 +48,7 @@ import {
 import {
   isSubagentModelAvailable,
   resolveSubagentThoughtOptionState,
+  type SubagentModelCatalogStatus,
 } from "@/settings/SubagentsSection.js";
 import { resolveModelDisplayName } from "@/lib/modelSelectionGroups.js";
 import { parseModelPickerValue } from "@/lib/zcodeSessionProjection.js";
@@ -79,7 +80,7 @@ export interface SubagentModelChainEditorProps {
   /** 模型选择视图，用于补齐思考档位默认值；未就绪时为 null */
   modelSelectionView?: ModelSelectionView | null;
   /** 模型目录是否仍在加载 */
-  modelSelectionLoading: boolean;
+  modelCatalogStatus: SubagentModelCatalogStatus;
   /** 「管理模型」入口；省略则不展示管理菜单项 */
   onManageModels?: () => void;
 }
@@ -143,7 +144,7 @@ function SubagentModelSlot({
   placeholder,
   modelGroups,
   modelSelectionView,
-  modelSelectionLoading,
+  modelCatalogStatus,
   disabled,
   onChange,
   onManageModels,
@@ -155,7 +156,8 @@ function SubagentModelSlot({
   placeholder: string;
   modelGroups: readonly ModelSelectGroup[];
   modelSelectionView?: ModelSelectionView | null;
-  modelSelectionLoading: boolean;
+  /** 模型目录状态：ready 有目录；loading 仍在读取；unavailable 读取失败或没有目录。 */
+  modelCatalogStatus: SubagentModelCatalogStatus;
   disabled: boolean;
   /** 槽位选择变化；传入 undefined 表示清除 */
   onChange: (selection: ModelSelection | undefined) => void;
@@ -167,11 +169,7 @@ function SubagentModelSlot({
   const pickerValue = hasSelection
     ? encodeCustomModelValue(selection.providerId, selection.modelId)
     : "";
-  const modelAvailable = isSubagentModelAvailable(
-    modelGroups,
-    pickerValue,
-    modelSelectionLoading,
-  );
+  const modelAvailable = isSubagentModelAvailable(modelGroups, pickerValue, modelCatalogStatus);
   const triggerLabel = pickerValue
     ? (resolveModelDisplayName(modelGroups, pickerValue) ?? pickerValue)
     : placeholder;
@@ -179,7 +177,7 @@ function SubagentModelSlot({
     model: pickerValue,
     modelAvailable,
     modelSelectionView,
-    modelSelectionLoading,
+    modelCatalogStatus,
     thoughtLevel: selection?.options?.reasoningLevel,
   });
 
@@ -277,7 +275,7 @@ function SortableFallbackRow({
   fallback,
   modelGroups,
   modelSelectionView,
-  modelSelectionLoading,
+  modelCatalogStatus,
   disabled,
   dragHint,
   moveUpLabel,
@@ -295,7 +293,7 @@ function SortableFallbackRow({
   fallback: ModelSelection;
   modelGroups: readonly ModelSelectGroup[];
   modelSelectionView?: ModelSelectionView | null;
-  modelSelectionLoading: boolean;
+  modelCatalogStatus: SubagentModelCatalogStatus;
   disabled: boolean;
   dragHint: string;
   moveUpLabel: string;
@@ -368,7 +366,7 @@ function SortableFallbackRow({
           placeholder={placeholder}
           modelGroups={modelGroups}
           modelSelectionView={modelSelectionView}
-          modelSelectionLoading={modelSelectionLoading}
+          modelCatalogStatus={modelCatalogStatus}
           disabled={disabled}
           onChange={onChange}
           onManageModels={onManageModels}
@@ -402,7 +400,7 @@ export function SubagentModelChainEditor({
   className,
   modelGroups,
   modelSelectionView,
-  modelSelectionLoading,
+  modelCatalogStatus,
   onManageModels,
 }: SubagentModelChainEditorProps) {
   const handleFallbackChange = useCallback(
@@ -560,7 +558,7 @@ export function SubagentModelChainEditor({
                   fallback={fallback}
                   modelGroups={modelGroups}
                   modelSelectionView={modelSelectionView}
-                  modelSelectionLoading={modelSelectionLoading}
+                  modelCatalogStatus={modelCatalogStatus}
                   disabled={disabled}
                   dragHint={dragHint}
                   moveUpLabel={intl.formatMessage(

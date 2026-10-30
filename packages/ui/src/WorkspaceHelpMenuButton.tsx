@@ -9,6 +9,7 @@ import {
   ActivityIcon,
   BookOpenIcon,
   CircleHelpIcon,
+  CopyIcon,
   DownloadIcon,
   LightbulbIcon,
   InfoIcon,
@@ -35,6 +36,7 @@ import { usePlatform } from "@/hooks/usePlatform.js";
 import { useVulnerabilityReportUrl } from "@/hooks/useVulnerabilityReportUrl.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { createHelpMenuActionHandlers } from "@/lib/helpMenuActions.js";
+import { toast } from "@/components/ui/toast.js";
 
 export function WorkspaceHelpMenuButton({
   className,
@@ -76,6 +78,19 @@ export function WorkspaceHelpMenuButton({
   // 用于「改设置/换模型/装插件后需要重启才生效」的场景，省去手动退出。
   const handleRelaunch = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.RelaunchApp);
+  };
+
+  const handleCopyDeviceMid = async () => {
+    try {
+      const deviceMid = platform.getDeviceId();
+      if (!deviceMid || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(deviceMid);
+      toast(intl.formatMessage({ id: "workspaceHeader.help.deviceMidCopied" }));
+    } catch {
+      toast(intl.formatMessage({ id: "workspaceHeader.help.deviceMidCopyFailed" }));
+    }
   };
 
   return (
@@ -142,6 +157,10 @@ export function WorkspaceHelpMenuButton({
             <DropdownMenuItem onSelect={helpMenuActions.exportLogs}>
               <DownloadIcon className="size-4" />
               {intl.formatMessage({ id: "titleBar.menu.help.exportLogs" })}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleCopyDeviceMid}>
+              <CopyIcon className="size-4" />
+              {intl.formatMessage({ id: "workspaceHeader.help.copyDeviceMid" })}
             </DropdownMenuItem>
             <DropdownMenuItem
               data-testid={TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER}

@@ -11,6 +11,7 @@ declare const __ZCODE_PRODUCT_FLAVOR__: string;
 declare const __ZCODE_ARMS_RUM_ENDPOINT__: string;
 declare const __ZCODE_TELEMETRY_REPORT_ENDPOINT__: string;
 declare const __ZCODE_AUTO_UPDATE_ENABLED__: boolean;
+declare const __ZCODE_CODE_SIGNING_ENABLED__: boolean;
 
 export function normalizeZCodeEnv(value: string | undefined): ZCodeEnv {
   return value?.trim().toLowerCase() === "production" ? "production" : "test";
@@ -60,6 +61,18 @@ export const ZCODE_TELEMETRY_REPORT_ENDPOINT: string =
 /** 桌面自动更新是否启用。 */
 export const ZCODE_AUTO_UPDATE_ENABLED: boolean =
   typeof __ZCODE_AUTO_UPDATE_ENABLED__ !== "undefined" ? __ZCODE_AUTO_UPDATE_ENABLED__ : false;
+
+/**
+ * 本次构建是否做了 Windows 代码签名。
+ *
+ * 上游在 quitAndInstall 前强制校验安装包的 Authenticode 签名；二开构建没有证书，
+ * 强校验会让每次自动更新都在安装前被拒。这里按构建期开关决定是否执行该校验：
+ * 有证书的构建保持上游的强校验，无证书的构建跳过（仅保留安装器存在性检查）。
+ */
+export const ZCODE_CODE_SIGNING_ENABLED: boolean =
+  typeof __ZCODE_CODE_SIGNING_ENABLED__ !== "undefined"
+    ? __ZCODE_CODE_SIGNING_ENABLED__
+    : false;
 
 /** 将本地运行态与编译期 ZCODE_ENV 映射为 ARMS 控制台识别的上报环境标签 */
 export function mapZCodeEnvToArmsRumEnv(runtimeEnv: ZCodeRuntimeEnv): ArmsRumEnv {

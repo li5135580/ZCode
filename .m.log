@@ -1,0 +1,47 @@
+Auto-merging README.en.md
+CONFLICT (content): Merge conflict in README.en.md
+Auto-merging README.md
+CONFLICT (content): Merge conflict in README.md
+Auto-merging apps/zcode-cli/packages/core/src/subagent/profile.ts
+Auto-merging apps/zcode-cli/packages/core/src/subagent/runner.ts
+CONFLICT (content): Merge conflict in apps/zcode-cli/packages/core/src/subagent/runner.ts
+Auto-merging config/provider/zcode-builtin.json
+CONFLICT (content): Merge conflict in config/provider/zcode-builtin.json
+Auto-merging docs/conversation-session-case-catalog.md
+Auto-merging package.json
+Auto-merging packages/desktop/electron-builder.config.js
+Auto-merging packages/desktop/scripts/bundle.mjs
+Auto-merging packages/desktop/scripts/node-pty-rebuild.mjs
+Auto-merging packages/desktop/src/main/autoUpdater.ts
+Auto-merging packages/desktop/src/main/desktopCommandHandlers.ts
+Auto-merging packages/desktop/src/main/index.ts
+Auto-merging packages/desktop/src/main/webRemoteControlManager.ts
+CONFLICT (modify/delete): packages/desktop/test/desktopApplicationMenu.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/desktop/test/desktopApplicationMenu.test.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/test/manifestUpdateProvider.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/desktop/test/manifestUpdateProvider.test.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/test/webRemoteControlManagerExternalRelay.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/desktop/test/webRemoteControlManagerExternalRelay.test.ts left in tree.
+CONFLICT (modify/delete): packages/desktop/test/webRemoteControlManagerV2.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/desktop/test/webRemoteControlManagerV2.test.ts left in tree.
+Auto-merging packages/desktop/vite.config.ts
+Auto-merging packages/services/src/index.ts
+Auto-merging packages/shared/src/index.ts
+Auto-merging packages/shared/src/test-ids.ts
+Auto-merging packages/shared/src/web-remote-control.ts
+CONFLICT (modify/delete): packages/shared/test/webRemoteControl.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/shared/test/webRemoteControl.test.ts left in tree.
+CONFLICT (modify/delete): packages/shared/test/zcodeEndpoint.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/shared/test/zcodeEndpoint.test.ts left in tree.
+Auto-merging packages/ui/src/WorkspaceHelpMenuButton.tsx
+CONFLICT (content): Merge conflict in packages/ui/src/WorkspaceHelpMenuButton.tsx
+Auto-merging packages/ui/src/i18n/locales/en-US.ts
+Auto-merging packages/ui/src/i18n/locales/zh-CN.ts
+Auto-merging packages/ui/src/settings/SubagentsSection.tsx
+CONFLICT (content): Merge conflict in packages/ui/src/settings/SubagentsSection.tsx
+Auto-merging packages/ui/src/settings/model-provider-section/InlineEditableProviderCard.tsx
+Auto-merging packages/ui/src/settings/model-provider-section/ProviderCardSections.tsx
+Auto-merging packages/ui/src/v4/ConversationComposer.tsx
+Auto-merging packages/ui/src/v4/ConversationRowView.tsx
+CONFLICT (modify/delete): packages/ui/test/conversationSelectionReference.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/conversationSelectionReference.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/markdownPreviewSelection.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/markdownPreviewSelection.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/markdownSelectionChip.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/markdownSelectionChip.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/updateStatusButton.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/updateStatusButton.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/useDesktopUpdateMenu.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/useDesktopUpdateMenu.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/windowsCaptionMenuButton.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/windowsCaptionMenuButton.test.ts left in tree.
+CONFLICT (modify/delete): packages/ui/test/workspaceHelpMenuButton.test.ts deleted in upstream/main and modified in HEAD.  Version HEAD of packages/ui/test/workspaceHelpMenuButton.test.ts left in tree.
+Automatic merge failed; fix conflicts and then commit the result.
