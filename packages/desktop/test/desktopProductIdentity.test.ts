@@ -27,6 +27,8 @@ describe("desktop product identity", () => {
       flavor: "preview",
       appId: "dev.zcode.app.preview",
       productName: "ZCode Preview",
+      // 二开新增：安装包文件名用连字符身份，避免产物名含空格导致 Release 资产名被改写。
+      artifactProductName: "ZCode-Preview",
       linuxExecutableName: "zcode-preview",
       linuxPackageName: "zcode-preview",
       cuaHelperInstallVariant: "preview",
@@ -82,6 +84,8 @@ describe("desktop product identity", () => {
       flavor: "production",
       appId: "dev.zcode.app",
       productName: "ZCode",
+      // 二开新增：正式包产物名保持无空格。
+      artifactProductName: "ZCode",
       linuxExecutableName: "zcode",
       linuxPackageName: "zcode",
       cuaHelperInstallVariant: null,
