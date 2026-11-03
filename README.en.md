@@ -144,8 +144,8 @@ official package), so the enhanced features are already included:
 - **Auto-update works**: the update feed points at this repository's Releases and can be
   checked manually from the app menu, tray, or Help menu. Each platform reads its own update
   manifest (Windows `latest.yml`, macOS `latest-mac.yml`, Linux `latest-linux.yml`). The
-  installer version is injected at build time (`<upstream patch+1>-fork.N`), so it is strictly
-  increasing in semver terms and installed clients receive updates normally.
+  installer version is injected at build time (`<upstream version>-fork.N`, e.g.
+  `3.17.2-fork.22`); within one upstream version, a higher fork number is a newer build.
 - **Upgrading from a 3.15.1 build needs one manual step**: that build's updater was never
   initialized, so download the new installer and install over it. Auto-update takes effect
   from that version onward.

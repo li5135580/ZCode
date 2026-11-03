@@ -926,7 +926,7 @@ const armsUserIdentitySync = createArmsUserIdentitySync({
 });
 const webRemoteControlAppVersion = ZCODE_VERSION || app.getVersion();
 // 远程控制入口（/remote/vN）对 app_version 做「官方已发布版本」白名单校验。
-// fork 的构建版本是 `上游 patch + 1`（如 3.16.3），上游从未发布过，网关直接 404。
+// fork 的构建版本带 fork 序号（如 3.17.2-fork.22），上游从未发布过，网关直接 404。
 // 入口只能上报上游基线版本；relay 注册等其它链路仍用真实版本。
 const webRemoteControlEntryAppVersion =
   ZCODE_UPSTREAM_VERSION || webRemoteControlAppVersion;

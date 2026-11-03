@@ -128,8 +128,8 @@ modelChain:
 - **Linux 只出 AppImage 与 deb**：rpm / pacman 需要构建机预装额外打包工具，暂未纳入 CI。
 - **自动更新可用**：更新源指向本仓库 Releases，可从应用菜单、托盘或帮助菜单手动检查。
   各平台读取各自的更新清单（Windows `latest.yml`、macOS `latest-mac.yml`、
-  Linux `latest-linux.yml`）。安装包的版本号由构建期注入（`<上游版本 patch+1>-fork.N`），
-  保证在 semver 上严格递增，因此装过旧包的机器可以正常收到更新。
+  Linux `latest-linux.yml`）。安装包的版本号由构建期注入（`<上游版本>-fork.N`，
+  例如 `3.17.2-fork.22`），同一上游版本内递增 fork 序号即构成升级链。
 - **从 3.15.1 旧包升级需手动一次**：旧包的 updater 从未初始化，需下载新包覆盖安装；
   从该版本起自动更新链路才生效。
 

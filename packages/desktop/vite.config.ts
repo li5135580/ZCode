@@ -223,7 +223,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       __ZCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
       // 上游基线版本：远程控制入口按官方发布版本白名单校验 app_version，
-      // fork 的 patch+1 版本会被网关 404，入口只能上报本值。
+      // fork 的带序号版本会被网关 404，入口只能上报本值。
       __ZCODE_UPSTREAM_VERSION__: JSON.stringify(
         buildMetadata.upstreamVersion ?? buildMetadata.appVersion,
       ),

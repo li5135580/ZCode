@@ -127,7 +127,7 @@ export function collectBuildMetadata() {
     // 根 package.json 的 version 必须与上游对齐，fork 版本只在构建期通过环境变量注入。
     appVersion: resolveAppVersion(rootPackageJson.version),
     // 上游基线版本（不受 ZCODE_APP_VERSION 覆盖）。远程控制入口按「官方已发布版本」
-    // 白名单校验 app_version，而 fork 的 patch+1 版本（如 3.16.3）并不存在，
+    // 白名单校验 app_version，而 fork 的带序号版本（如 3.17.2-fork.22）并不存在，
     // 会被网关直接返回 404。因此入口只能用这个基线版本，不能用 appVersion。
     upstreamVersion: normalizeVersion(rootPackageJson.version),
     minCompatibleVersion: normalizeVersion(
