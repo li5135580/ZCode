@@ -21,7 +21,9 @@ jobs:
           # macOS 只出 arm64：Intel Mac 已停止出货，单独维护 x64 产物的收益低于构建成本。
           # 未签名构建依赖 electron-builder 的 ad-hoc 签名（arm64 强制要求），
           # 用户首次打开需要右键「打开」或清除 quarantine 属性。
-          - os: macos-latest
+          # 固定 macos-14（同为 arm64）而不是 macos-latest：2026-11-04 起 macos-latest
+          # 连续三次排队 15 分钟拿不到 runner 被取消（0 步骤、无 runner），换固定版本号规避。
+          - os: macos-14
             target: mac
             arch: arm64
           - os: ubuntu-latest
