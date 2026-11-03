@@ -1,0 +1,71 @@
+name: Tests
+
+# 二开此前没有任何单测门禁：build-release.yml 只做构建与打包，sync-upstream.yml 只做上游同步。
+# 上游 v3.17.1 起 App 业务单测退役、改为 scripts/engineering-test-files.json 白名单，
+# 二开自带用例曾整体掉出白名单且无人发现。这个工作流把「白名单单测 + 全量类型检查」变成常驻门禁。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    # 类型检查是二开改动最直接的护栏（上次上游把 modelSelectionLoading 改成
+    # modelCatalogStatus 就是它拦下的），单独成 job 便于区分失败原因。
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Install pnpm
+        # 与 build-release.yml 保持一致：本项目用 pnpm 10 的 hoisted linker，
+        # pnpm 11 不再读 package.json 的 pnpm 字段，会丢掉 overrides 与补丁。
+        run: |
+          npm install -g pnpm@10.33.2
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  engineering-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.14.0'
+
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm@10.33.2
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+
+      - name: Engineering tests
+        # 跑的就是 scripts/engineering-test-files.json 白名单；二开的用量状态条、
+        # 已下架模型清理、更新弹窗高度、发布版本推导等用例都在其中。
+        run: pnpm test:engineering

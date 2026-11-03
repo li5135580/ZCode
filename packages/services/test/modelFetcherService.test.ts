@@ -63,7 +63,10 @@ describe("fetchProviderModels 内置配置匹配", () => {
     );
 
     expect(result.success).toBe(true);
+    // 上游 3.17.x 的 moonshot 模板规则新增了 Kimi K3.1 Pro 两款，期望值随内置配置更新。
     expect(result.models.map((model) => model.modelId)).toEqual([
+      "kimi-k3.1-pro",
+      "kimi-k3.1-pro-highspeed",
       "kimi-k3",
       "kimi-k2.7-code",
       "kimi-k2.6",

@@ -34,7 +34,8 @@ describe("Subagent model chain 挂载", () => {
     const editorBlock = source.slice(editorIndex, editorIndex + 900);
     expect(editorBlock).toContain("modelGroups={modelSelectGroups}");
     expect(editorBlock).toContain("modelSelectionView={modelSelectionView}");
-    expect(editorBlock).toContain("modelSelectionLoading={modelSelectionLoading}");
+    // 上游 3.17.1 起模型目录状态由布尔 loading 变成三态 modelCatalogStatus，二开接线随之调整。
+    expect(editorBlock).toContain("modelCatalogStatus={modelCatalogStatus}");
     expect(editorBlock).toContain("onManageModels={onManageModels}");
   });
 
