@@ -49,7 +49,7 @@ describe("build-metadata appVersion", () => {
 
   it("upstreamVersion 不受 ZCODE_APP_VERSION 覆盖影响", () => {
     // 远程控制入口按「官方已发布版本」白名单校验 app_version，fork 的带序号版本
-    // （3.17.2-fork.22）上游从未发布，网关会直接返回 404。所以这里必须保留基线版本。
+    // （3.17.3-fork.1）上游从未发布，网关会直接返回 404。所以这里必须保留基线版本。
     const previous = process.env.ZCODE_APP_VERSION;
     process.env.ZCODE_APP_VERSION = "3.16.3-fork.17";
     try {

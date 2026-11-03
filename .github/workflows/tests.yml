@@ -65,6 +65,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
 
+      - name: Build workspace packages used by tests
+        # 白名单用例会传递 import @zcode/contracts、@zcode/e2e-report 等 workspace 包，其 exports 指向 dist；
+        # CI 是干净检出、install 不产出 dist，缺产物时 vitest 报 "Failed to resolve entry for package"；
+        # 故先按 build:bootstrap 的同一套 filter 构建依赖包（desktop 本体太重，与那里一致排除）。
+        run: pnpm -r --filter "./packages/*" --filter "!@zcode/desktop" --filter "./apps/zcode-cli/packages/*" build
+
       - name: Engineering tests
         # 跑的就是 scripts/engineering-test-files.json 白名单；二开的用量状态条、
         # 已下架模型清理、更新弹窗高度、发布版本推导等用例都在其中。

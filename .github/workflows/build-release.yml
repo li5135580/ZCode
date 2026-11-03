@@ -63,9 +63,9 @@ jobs:
 
       - name: Resolve fork app version
         shell: bash
-        # 构建期注入 fork 版本：tag 的版本号就是上游对齐版本，fork 序号原样保留
-        # （tag `v3.17.2-fork.22` → 产物 `3.17.2-fork.22`），一眼能看出基于哪个上游版本；
-        # 同基底递增 fork 序号即构成升级链（3.17.2-fork.22 > 3.17.2-fork.21）。
+        # 构建期注入 fork 版本：tag 的 base 版本 patch + 1，fork 序号原样保留
+        # （tag `v3.17.2-fork.1` → 产物 `3.17.3-fork.1`），版号必须大于上游才能收到更新；
+        # 同一上游版本内递增 fork 序号即构成升级链（3.17.3-fork.2 > 3.17.3-fork.1）。
         # 推导逻辑在 scripts/ci/fork-release-version.mjs（有单测），这里只负责写 GITHUB_ENV。
         run: |
           set -euo pipefail
@@ -183,7 +183,7 @@ jobs:
       - name: Verify remote control entry version
         shell: bash
         # 远程控制入口 /remote/vN 对 app_version 做「官方已发布版本」白名单校验：
-        # 传 fork 的带序号版本（如 3.17.2-fork.22）会 404「Not Found.」，整页打不开；
+        # 传 fork 的产物版本（如 3.17.3-fork.1）会 404「Not Found.」，整页打不开；
         # 传上游基线（如 3.17.2）才 200。这里校验构建产物里上报给入口的版本
         # 确实是上游基线，而不是被 ZCODE_APP_VERSION 覆盖后的 fork 版本。
         run: |

@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.17.2-fork.22`）
+# ZCode 二开增强版（构建标签 `v3.17.2-fork.1`）
 
 ## 📦 发布内容
 
@@ -7,12 +7,12 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.17.2-fork.22-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.17.2-fork.22-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.17.2-fork.22-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.17.2-fork.22-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.17.2-fork.22-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.17.2-fork.22-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.17.3-fork.1-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.17.3-fork.1-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.17.3-fork.1-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.17.3-fork.1-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.17.3-fork.1-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.17.3-fork.1-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
@@ -20,27 +20,30 @@
 
 ## 🏷️ 版本号规则变更
 
-从本版起，产物版本号**直接沿用上游对齐版本**再加 fork 序号：
+从本版起，tag 与产物版本统一按「base 版本 patch + 1 + fork 序号」推导：
+tag 里 base 版本的 patch 位加一，再原样接上 fork 序号，作为实际产物版本。
 
-| | 本版之前 | 本版起 |
-| --- | --- | --- |
-| tag | `v3.17.1-fork.21` | `v3.17.2-fork.22` |
-| 产物版本 | `3.17.2-fork.21`（上游 patch + 1） | `3.17.2-fork.22`（上游版本 + fork 序号） |
+| | 取值 |
+| --- | --- |
+| tag | `v3.17.2-fork.1` |
+| 产物版本 | `3.17.3-fork.1` |
 
-改动的理由是**可读性**：以前看到 `3.17.2-fork.21` 还要心算一次才知道它基于上游
-`3.17.1`；现在版本号里的 `3.17.2` 就是上游版本，一眼可读。
+tag 直接写明对齐的上游版本，产物版本由 CI 按上述规则推导
+（`scripts/ci/fork-release-version.mjs`），不需要人工换算。
 
+本次 fork 序号从 **1** 开始（本版规则重置），patch + 1 保证产物版本仍然更大。
 有两点必须说明，否则容易踩坑：
 
-1. **不能写成 `3.17.2fork1`**。那不是合法 semver（缺少分隔符），
+1. **不能写成 `3.17.3fork1`**。那不是合法 semver（缺少分隔符），
    electron-builder 在打包阶段就会拒绝，electron-updater 也无法比较大小。
-   合法且直观的形式是 `3.17.2-fork.22`。
-2. **fork 序号没有重置为 1**。`3.17.2-fork.1` 在 semver 里**小于**已安装的
-   `3.17.2-fork.21`，老用户会收不到这次更新。序号继续递增才能保证升级链不断。
+   合法且直观的形式必须带分隔符，即 `3.17.3-fork.1`。
+2. **序号重置为 1 不会断掉升级链**。`3.17.3-fork.1` 的 patch 比已安装的
+   `3.17.2-fork.21` 高一位，在 semver 里**大于**它，老用户照样能收到本次更新；
+   之后同基底内递增 fork 序号继续构成升级链。
 
-升级链验证：`3.17.2-fork.22 > 3.17.2-fork.21`（同基底、序号更高），
-上游下一版 `3.17.3-fork.N` 天然大于本版。该规则有单测覆盖
-（`packages/desktop/test/forkReleaseVersion.test.ts`）。
+升级链验证：`3.17.3-fork.1 > 3.17.2-fork.21`（patch 更高），
+本版之后递增序号（`3.17.3-fork.2`）与上游下一版（`3.17.4-fork.N`）也都天然更大。
+该规则有单测覆盖（`packages/desktop/test/forkReleaseVersion.test.ts`）。
 
 ## 🔄 本版对齐上游 v3.17.2
 

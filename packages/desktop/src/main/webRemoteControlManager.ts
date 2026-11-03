@@ -183,7 +183,7 @@ interface WebRemoteControlManagerDependencies {
    *
    * 入口 `/remote/vN` 按「官方已发布版本」白名单校验该参数，未发布的值直接返回
    * 404「Not Found.」，手机端整页打不开。fork 为了满足 electron-updater 的 semver
-   * 带 fork 序号（如 3.17.2-fork.22），那个版本上游从未发布过，
+   * 带 fork 序号（如 3.17.3-fork.1），那个版本上游从未发布过，
    * 因此这里必须传上游基线版本，而不是 `appVersion`。
    */
   remoteEntryAppVersion: string;
