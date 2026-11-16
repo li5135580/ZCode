@@ -15,14 +15,32 @@ export function resolveRuntimeHostBuild(
 ) {
   if (arch !== "x64" && arch !== "arm64")
     throw new Error(`Unsupported runtime host architecture: ${arch}`);
+  if (hostPlatform !== "win32") {
+    return {
+      configureArgs: [
+        "-DCMAKE_SYSTEM_NAME=Windows",
+        `-DCMAKE_CXX_COMPILER=${compiler || (arch === "arm64" ? "aarch64-w64-mingw32-clang++" : "x86_64-w64-mingw32-g++")}`,
+      ],
+    };
+  }
+  // Windows 上优先用 MinGW：GitHub 的 windows-latest 镜像已不再预装 Visual Studio，
+  // 写死 `-G "Visual Studio 17 2022"` 会在 CI 与本机都直接失败（2026-11-16 实测）。
+  // ZCODE_RUNTIME_HOST_GENERATOR 允许显式指定生成器，供有 VS 的机器继续用 MSVC。
+  const generator = process.env.ZCODE_RUNTIME_HOST_GENERATOR?.trim();
+  if (generator) {
+    return {
+      configureArgs:
+        generator === "MinGW Makefiles"
+          ? ["-G", generator, `-DCMAKE_CXX_COMPILER=${compiler || "x86_64-w64-mingw32-g++"}`]
+          : ["-G", generator, "-A", arch === "arm64" ? "ARM64" : "x64"],
+    };
+  }
   return {
-    configureArgs:
-      hostPlatform === "win32"
-        ? ["-G", "Visual Studio 17 2022", "-A", arch === "arm64" ? "ARM64" : "x64"]
-        : [
-            "-DCMAKE_SYSTEM_NAME=Windows",
-            `-DCMAKE_CXX_COMPILER=${compiler || (arch === "arm64" ? "aarch64-w64-mingw32-clang++" : "x86_64-w64-mingw32-g++")}`,
-          ],
+    configureArgs: [
+      "-G",
+      "MinGW Makefiles",
+      `-DCMAKE_CXX_COMPILER=${compiler || "x86_64-w64-mingw32-g++"}`,
+    ],
   };
 }
 

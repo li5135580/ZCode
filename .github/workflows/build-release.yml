@@ -46,6 +46,20 @@ jobs:
         with:
           node-version: '24.14.0'
 
+      - name: Install C++ toolchain for Windows runtime host
+        # 上游 v3.18 起 afterPack 会硬校验 zcode-runtime-host.exe 与
+        # zcode-installer-process-helper.exe 存在，二者需用 CMake 编译。
+        # GitHub 的 windows-latest 镜像已不再预装 Visual Studio，因此改用 MinGW；
+        # 非 Windows 平台走交叉编译（-DCMAKE_SYSTEM_NAME=Windows），这里只需装 g++。
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: |
+          # cmake 镜像已预装；MinGW 需要显式安装并加进 PATH。
+          choco install mingw --no-progress -y
+          "C:\ProgramData\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          cmake --version
+          & "C:\ProgramData\mingw64\bin\x86_64-w64-mingw32-g++.exe" --version
+
       - name: Install pnpm
         run: |
           npm install -g pnpm@10.33.2
@@ -55,6 +69,11 @@ jobs:
         # 必须用 --frozen-lockfile：--no-frozen-lockfile 会让 pnpm 重新解析依赖图，
         # 丢掉 lockfile 里的 overrides（react 版本锁定）和全部 patchedDependencies 补丁，
         # 生成损坏的依赖树（esbuild JS 库与平台二进制版本错配），导致 tsup/tsx 直接崩溃。
+        #
+        # overrides 里的 `tsup>esbuild` 与 `react-scan>esbuild` 都是为了消除嵌套 esbuild：
+        # 这两个包要 esbuild ^0.27.0，而根提升的是 0.25.12，于是各被装出一份嵌套副本；
+        # pnpm 10 的 hardLinkDir 在并发安装时会与同级暂存目录互踩，报
+        # ERR_PNPM_ENOENT rename '_tmp_*' -> 'esbuild'，整个 install 失败。
         run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
 
       - name: Print tool versions

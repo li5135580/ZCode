@@ -10,6 +10,7 @@ overrides:
   react: 19.2.7
   react-dom: 19.2.7
   react-scan>esbuild: 0.27.7
+  tsup>esbuild: 0.27.7
 
 patchedDependencies:
   '@ai-sdk/anthropic@3.0.81':
