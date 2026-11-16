@@ -40,7 +40,7 @@ jobs:
           pnpm --version
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+        run: pnpm install --frozen-lockfile --child-concurrency=1 --fetch-retries=5 --fetch-timeout=120000
 
       - name: Typecheck
         run: pnpm typecheck
@@ -63,7 +63,7 @@ jobs:
           pnpm --version
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+        run: pnpm install --frozen-lockfile --child-concurrency=1 --fetch-retries=5 --fetch-timeout=120000
 
       - name: Build workspace packages used by tests
         # 白名单用例会传递 import @zcode/contracts、@zcode/e2e-report 等 workspace 包，其 exports 指向 dist；

@@ -49,16 +49,19 @@ jobs:
       - name: Install C++ toolchain for Windows runtime host
         # 上游 v3.18 起 afterPack 会硬校验 zcode-runtime-host.exe 与
         # zcode-installer-process-helper.exe 存在，二者需用 CMake 编译。
-        # GitHub 的 windows-latest 镜像已不再预装 Visual Studio，因此改用 MinGW；
-        # 非 Windows 平台走交叉编译（-DCMAKE_SYSTEM_NAME=Windows），这里只需装 g++。
+        # GitHub 的 windows-latest 镜像已不再预装 Visual Studio，因此改用 MinGW。
         if: matrix.target == 'win'
         shell: pwsh
         run: |
-          # cmake 镜像已预装；MinGW 需要显式安装并加进 PATH。
+          # cmake 镜像已预装。choco 的 mingw 包把工具链放在 ProgramData\mingw64\mingw64\bin
+          # （多一层同名目录），不是常见的 ProgramData\mingw64\bin。
           choco install mingw --no-progress -y
-          "C:\ProgramData\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $mingwBin = "C:\ProgramData\mingw64\mingw64\bin"
+          if (-not (Test-Path $mingwBin)) { throw "MinGW bin not found at $mingwBin" }
+          $mingwBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $env:PATH = "$mingwBin;$env:PATH"
           cmake --version
-          & "C:\ProgramData\mingw64\bin\x86_64-w64-mingw32-g++.exe" --version
+          & "$mingwBin\x86_64-w64-mingw32-g++.exe" --version
 
       - name: Install pnpm
         run: |
@@ -74,7 +77,11 @@ jobs:
         # 这两个包要 esbuild ^0.27.0，而根提升的是 0.25.12，于是各被装出一份嵌套副本；
         # pnpm 10 的 hardLinkDir 在并发安装时会与同级暂存目录互踩，报
         # ERR_PNPM_ENOENT rename '_tmp_*' -> 'esbuild'，整个 install 失败。
-        run: pnpm install --frozen-lockfile --fetch-retries=5 --fetch-timeout=120000
+        #
+        # overrides 只能减少嵌套副本的数量，无法根除：node-linker=hoisted 下 pnpm 用
+        # hardLinkDir 提升所有包，并发时仍会互踩。--child-concurrency=1 把安装子进程
+        # 串行化，从根上避免同一目录被两个子进程同时 rename。
+        run: pnpm install --frozen-lockfile --child-concurrency=1 --fetch-retries=5 --fetch-timeout=120000
 
       - name: Print tool versions
         run: |
