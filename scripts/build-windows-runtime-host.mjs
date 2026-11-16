@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -96,17 +97,32 @@ export async function buildRuntimeHost({ arch, outputDir }) {
   const plan = resolveRuntimeHostBuild(arch);
   const work = await mkdtemp(join(tmpdir(), "zcode-runtime-host-"));
   try {
-    await run(["-S", source, "-B", work, ...plan.configureArgs, "-DCMAKE_BUILD_TYPE=Release"]);
+    // 源码目录含非 ASCII 字符时（例如本机放在 D 盘的中文目录下），MinGW 的 cc1plus 会把
+    // 路径按 GBK 解码成乱码后找不到文件。先把源码复制进 ASCII 临时目录再配置，
+    // 这样构建路径与仓库路径无关。
+    const buildSource = join(work, "src");
+    const buildDir = join(work, "build");
+    await mkdir(buildSource, { recursive: true });
+    // CMakeLists 里还声明了 acceptance / fixture 两个 EXCLUDE_FROM_ALL 目标，
+    // 它们的源文件也必须一起复制，否则 CMake 配置阶段就会报找不到源文件。
+    for (const name of await readdir(source)) {
+      if (!name.endsWith(".cpp") && name !== "CMakeLists.txt") continue;
+      await copyFile(join(source, name), join(buildSource, name));
+    }
+    await run(["-S", buildSource, "-B", buildDir, ...plan.configureArgs, "-DCMAKE_BUILD_TYPE=Release"]);
     await run([
       "--build",
-      work,
+      buildDir,
       "--config",
       "Release",
       "--target",
       "zcode-runtime-host",
       "zcode-installer-process-helper",
     ]);
-    const releaseDir = join(work, ...(process.platform === "win32" ? ["Release"] : []));
+    // 产物目录随生成器而变：MSVC（Visual Studio 生成器）是多配置生成器，产物落在
+    // Release/ 子目录；MinGW Makefiles 是单配置生成器，直接落在构建根目录。
+    // 过去写死 win32 => Release/，在没有 VS 的机器上（改用 MinGW 后）必然找不到产物。
+    const releaseDir = existsSync(join(buildDir, "Release")) ? join(buildDir, "Release") : buildDir;
     const hostBytes = await readFile(join(releaseDir, "zcode-runtime-host.exe"));
     const helperBytes = await readFile(join(releaseDir, "zcode-installer-process-helper.exe"));
     verifyRuntimeHostPe(hostBytes, arch);
