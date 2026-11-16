@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v3.18.2-fork.1`）
+# ZCode 二开增强版（构建标签 `v3.18.2-fork.2`）
 
 ## 📦 发布内容
 
@@ -7,20 +7,34 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-3.18.3-fork.1-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-3.18.3-fork.1-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-3.18.3-fork.1-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
-| `ZCode-Preview-3.18.3-fork.1-mac-arm64.zip` | macOS 自动更新用的压缩包 |
-| `ZCode-Preview-3.18.3-fork.1-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-3.18.3-fork.1-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-3.18.3-fork.2-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-3.18.3-fork.2-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-3.18.3-fork.2-mac-arm64.dmg` | macOS Apple Silicon 安装镜像 |
+| `ZCode-Preview-3.18.3-fork.2-mac-arm64.zip` | macOS 自动更新用的压缩包 |
+| `ZCode-Preview-3.18.3-fork.2-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-3.18.3-fork.2-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-mac.yml` / `latest-linux.yml` | 各平台的 electron-updater 更新元数据 |
 
 > 版本号规则：tag 的 base 版本 patch + 1，再带 fork 序号。tag `v3.18.2-fork.1`
-> 产出 `3.18.3-fork.1`。patch + 1 保证产物版本大于已安装的 `3.17.3-fork.1`，
+> 产出 `3.18.3-fork.2`。patch + 1 保证产物版本大于已安装的 `3.17.3-fork.1`，
 > 老用户能正常收到更新；写成 `3.18.2-fork.1` 会因小于已装版本而收不到。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
+
+## 🔴 本版修复：升级后登录态丢失、无法重新登录
+
+**如果你装过 3.18.3-fork.1，登录态会丢失，且点浏览器授权登录一直报「登录失败，请重试」。**
+本版修复了它，**装上新包后登录会自动恢复，不需要重新登录。**
+
+原因：3.18.3-fork.1 的安装包缺了 `@napi-rs/keyring` 的 Windows 原生二进制
+（`app.asar` 里只有 5 个纯 JS 文件，没有任何 `.node`）。ZCode 用系统凭据管理器
+（Windows Credential Manager）加密保存登录凭证，拿不到这个二进制就访问不了密钥，
+所有凭证操作都报 `System credential storage is unavailable`。
+
+你的数据没有损坏——密钥条目仍在系统凭据管理器里。现在打包流程会在打包前把目标平台的
+`.node` 复制进 keyring 本体目录（让 `index.js` 的第一条加载路径稳定命中），
+并在打包后强制校验，Windows 缺这个文件会直接让构建失败，不会再产出有问题的安装包。
 
 ## 🔄 本版对齐上游 v3.18.2
 
