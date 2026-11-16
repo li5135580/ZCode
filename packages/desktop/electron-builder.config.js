@@ -8,6 +8,11 @@ import { HELPER_APP_NAME } from "@zcode/zcode-cua/broker/helperConstants";
 import { runCommand, runCommandAndReadStdout } from "../../scripts/spawn-command.mjs";
 import { loadBuiltinProviderConfig } from "../../scripts/builtin-provider-config.mjs";
 import { noticesFileName, stageElectronNotices } from "../../scripts/third-party-notices.mjs";
+import { keyringPlatformPackage } from "../../scripts/stage-credential-keyring.mjs";
+import {
+  prepareCredentialKeyring,
+  resolveKeyringNativeFileName,
+} from "../../scripts/prepare-credential-keyring.mjs";
 import { resolveNativeSearchReleasePlan } from "../../scripts/native-search-tools-config.mjs";
 import { getBuildMetadata } from "./scripts/build-metadata.mjs";
 import { collectRuntimeModuleClosureEntries } from "./scripts/runtime-dependency-closure.mjs";
@@ -545,6 +550,31 @@ function assertPackagedNodePtyPrebuild(context) {
     throw new Error(`node-pty 预编译产物缺失: ${targetBinaryPath}`);
 }
 
+function assertPackagedCredentialKeyring(context) {
+  const keyringUnpackedDirectory = resolve(
+    resolvePackagedResourcesDir(context),
+    "app.asar.unpacked",
+    "node_modules",
+    "@napi-rs",
+    "keyring",
+  );
+  const nativeFileName = resolveKeyringNativeFileName(targetPlatform.key);
+  const targetBinaryPath = resolve(keyringUnpackedDirectory, nativeFileName);
+  if (existsSync(targetBinaryPath)) return;
+
+  // 事故修复：Windows 安装包缺这个 .node 时 @napi-rs/keyring 两条加载路径全部落空，
+  // 用户升级后登录态丢失且无法重新登录（2026-11 安装包实况），win32 必须 fail-closed；
+  // darwin/linux 保留 warn 是因为其登录链路另有迁移兜底，不因单个可选二进制硬中断出包。
+  const message =
+    `keyring 原生二进制缺失: ${targetBinaryPath}。缺失该文件的安装包会导致 ` +
+    `${targetPlatform.key} 用户登录态丢失且无法重新登录；` +
+    `请检查 beforePack:prepareCredentialKeyring 日志与 ${keyringPlatformPackage(targetPlatform.key)} 安装状态。`;
+  if (targetPlatform.os === "win32") {
+    throw new Error(message);
+  }
+  console.warn(`[afterPack] ${message}`);
+}
+
 function assertPackagedCuaSharp(context) {
   if (!isSharpRequiredByComputerUse({ desktopPackageRoot })) return;
   const problems = [
@@ -718,6 +748,10 @@ export default {
   ],
   asarUnpack: [
     "node_modules/@napi-rs/keyring-*/**/*.node",
+    // 事故修复：keyring 的原生二进制由 beforePack 复制进本体目录（见 prepareCredentialKeyring），
+    // 不再依赖 optional 平台包是否被收集；本体目录下的 keyring.<triple>.node 必须单独 unpack，
+    // 否则文件会留在 app.asar 内导致加载失败、登录态丢失。
+    "node_modules/@napi-rs/keyring/keyring.*.node",
     // node-pty 的 target prebuild 还包含 spawn-helper / winpty-agent.exe 等辅助可执行文件，
     // 整个目标目录必须 unpack；其他平台目录已由 files 规则裁剪。
     `node_modules/node-pty/prebuilds/${targetPlatform.key}/**`,
@@ -725,6 +759,12 @@ export default {
   beforePack: async (context) => {
     runTimedSync("beforePack:restoreTargetNodePtyPrebuild", () =>
       restoreTargetNodePtyPrebuild({ desktopPackageRoot, targetPlatform }),
+    );
+    // 事故修复：optional 平台包在 CI 上可能被静默跳过，keyring 只剩纯 JS 本体，
+    // 安装包升级后登录态丢失且无法重新登录。打包前把目标平台二进制复制进
+    // keyring 本体目录，让 index.js 的第一条加载路径稳定命中；win32 缺源包直接失败。
+    runTimedSync("beforePack:prepareCredentialKeyring", () =>
+      prepareCredentialKeyring({ workspaceRoot, targetPlatform }),
     );
     if (context.electronPlatformName !== "win32" || nsisInstallSectionPatched) {
       return;
@@ -796,6 +836,9 @@ export default {
     );
     runTimedSync("afterPack:assertPackagedNodePtyPrebuild", () =>
       assertPackagedNodePtyPrebuild(context),
+    );
+    runTimedSync("afterPack:assertPackagedCredentialKeyring", () =>
+      assertPackagedCredentialKeyring(context),
     );
     runTimedSync("afterPack:assertPackagedCuaSharp", () => assertPackagedCuaSharp(context));
     runTimedSync("afterPack:assertPackagedCuaKoffi", () => assertPackagedCuaKoffi(context));
