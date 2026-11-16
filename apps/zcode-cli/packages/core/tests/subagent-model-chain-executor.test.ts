@@ -36,7 +36,7 @@ describe("executeWithModelChain 执行顺序", () => {
       usedModel: primary,
     });
     expect(executor).toHaveBeenCalledTimes(1);
-    expect(executor).toHaveBeenCalledWith(primary);
+    expect(executor.mock.calls[0]?.[0]).toEqual(primary);
     expect(fallbackToMain).not.toHaveBeenCalled();
   });
 
@@ -90,7 +90,7 @@ describe("executeWithModelChain 执行顺序", () => {
   it("没有备用模型时 primary 成功即结束", async () => {
     const executor = vi.fn(async () => undefined);
     await executeWithModelChain(chain({ fallbacks: [] }), executor, async () => undefined);
-    expect(executor).toHaveBeenCalledWith(primary);
+    expect(executor.mock.calls[0]?.[0]).toEqual(primary);
   });
 });
 
@@ -244,6 +244,80 @@ describe("model-chain-failure-detector 分类驱动链式回退", () => {
       throw nonRetryableError();
     });
     await executeWithModelChain(chain({ fallbacks: [], retryCount: 3 }), executor, async () => {});
+    expect(executor).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("executeWithModelChain 续跑与失败收口", () => {
+  it("首次尝试 attemptIndex 为 0，重试与切换模型后递增", async () => {
+    const seen: number[] = [];
+    const executor = vi.fn(async (_model: ModelSelection, attempt: { attemptIndex: number }) => {
+      seen.push(attempt.attemptIndex);
+      if (attempt.attemptIndex < 2) throw new Error("network down");
+    });
+
+    await executeWithModelChain(chain({ retryCount: 1 }), executor, async () => undefined);
+
+    // 首次 0，同模型重试 1，切换备用模型 2。
+    expect(seen).toEqual([0, 1, 2]);
+  });
+
+  it("每次失败后、重试或切换之前都会调用失败收口", async () => {
+    const settle = vi.fn(async () => undefined);
+    const executor = vi.fn(async (_model: ModelSelection, attempt: { attemptIndex: number }) => {
+      if (attempt.attemptIndex < 2) throw new Error("network down");
+    });
+
+    await executeWithModelChain(
+      chain({ retryCount: 1 }),
+      executor,
+      async () => undefined,
+      settle,
+    );
+
+    // 两次失败各收口一次；成功的那次不收口。
+    expect(settle).toHaveBeenCalledTimes(2);
+  });
+
+  it("收口抛错不会掩盖原始失败原因", async () => {
+    const settle = vi.fn(async () => {
+      throw new Error("settle exploded");
+    });
+    const executor = vi.fn(async () => {
+      throw new Error("original provider failure");
+    });
+
+    const result = await executeWithModelChain(
+      chain({ fallbacks: [], retryCount: 0 }),
+      executor,
+      async () => {
+        throw new Error("main fallback also failed");
+      },
+      settle,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toBe("main fallback also failed");
+  });
+
+  it("取消是终态：不收口、不重试、不切换", async () => {
+    const settle = vi.fn(async () => undefined);
+    const executor = vi.fn(async () => {
+      // 取消必须用 CoreError 的 CANCEL/ABORT 码表达，普通 Error 文案不算取消。
+      throw createCoreError(CoreErrorType.ToolCancelled, "cancelled by user", {
+        recoverable: true,
+      });
+    });
+
+    const result = await executeWithModelChain(
+      chain(),
+      executor,
+      async () => undefined,
+      settle,
+    );
+
+    expect(result.success).toBe(false);
+    expect(settle).not.toHaveBeenCalled();
     expect(executor).toHaveBeenCalledTimes(1);
   });
 });

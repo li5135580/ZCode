@@ -32,6 +32,21 @@ export interface ModelChainExecutionResult {
   error?: Error;
 }
 
+/**
+ * 一次链上尝试的上下文。
+ *
+ * `attemptIndex` 为 0 表示本轮链的首次执行；大于 0 说明之前已有尝试失败，
+ * 调用方可以复用上一次落库的子会话历史续跑，而不是从零重来。
+ */
+export interface ModelChainAttemptInfo {
+  /** 本轮链内的尝试序号，从 0 开始（跨模型累加，重试同模型也算新的一次）。 */
+  attemptIndex: number;
+  /** 本次尝试使用的模型选型。 */
+  model: ModelSelection;
+  /** 链上模型序号：0 为 primary，大于 0 为备用模型。 */
+  chainIndex: number;
+}
+
 /** 单个模型的尝试次数下限：即使 retryCount 非正，也至少尝试一次。 */
 const MIN_RETRY_BUDGET = 0;
 
@@ -47,19 +62,27 @@ const MIN_RETRY_BUDGET = 0;
  * 5. 链上全部模型失败后调用 `fallbackToMain` 回退到主 Agent 兜底执行。
  *
  * @param chain 子智能体 profile 声明的模型链（primary + fallbacks + retryCount）
- * @param executor 单次执行：使用给定选型跑一次子智能体；抛错即视为该次尝试失败
+ * @param executor 单次执行：使用给定选型跑一次子智能体；抛错即视为该次尝试失败。
+ *   第二个参数 `attempt` 告诉调用方这是第几次尝试（0 表示首次），调用方据此决定
+ *   是否复用上一次已落库的子会话历史（续跑），从而不重跑已完成的工具调用。
+ * @param settleFailedAttempt 失败收口：每次尝试失败、且即将重试或切换模型前调用。
+ *   调用方应在此把已接受的工具调用收口成真实结果 / interrupted 结果，使下一次尝试
+ *   的续跑历史里不会出现「有 tool_use 无 tool_result」的残缺回合。
  * @param fallbackToMain 主 Agent 兜底执行：链上模型全部失败后调用，抛错即视为兜底也失败
  * @returns 执行结果；失败时 `error` 携带最后一次错误，由调用方决定如何上报
  */
 export async function executeWithModelChain(
   chain: SubagentModelChain,
-  executor: (model: ModelSelection) => Promise<unknown>,
-  fallbackToMain: () => Promise<unknown>,
+  executor: (model: ModelSelection, attempt: ModelChainAttemptInfo) => Promise<unknown>,
+  fallbackToMain: (attempt: ModelChainAttemptInfo) => Promise<unknown>,
+  settleFailedAttempt?: () => Promise<void> | void,
 ): Promise<ModelChainExecutionResult> {
   const selections = getModelChainSelections(chain);
   const retryBudgetPerModel = normalizeRetryBudget(chain.retryCount);
   let lastModel: ModelSelection = chain.primary;
   let lastError: Error | undefined;
+  // 跨模型累加的尝试序号：>0 时调用方可以复用上一次落库的子会话历史续跑。
+  let attemptIndex = 0;
 
   for (let index = 0; index < selections.length; index += 1) {
     const model = selections[index];
@@ -67,8 +90,9 @@ export async function executeWithModelChain(
     lastModel = model;
     let remainingRetries = retryBudgetPerModel;
     for (;;) {
+      const attempt: ModelChainAttemptInfo = { attemptIndex, chainIndex: index, model };
       try {
-        await executor(model);
+        await executor(model, attempt);
         return { fallbackUsed: index > 0, success: true, usedModel: model };
       } catch (error) {
         lastError = toError(error);
@@ -76,6 +100,11 @@ export async function executeWithModelChain(
           // 取消是终态：继续重试或换模型都会让父 Agent 的取消语义失真。
           return { error: lastError, fallbackUsed: index > 0, success: false, usedModel: model };
         }
+        // 失败收口必须发生在重试/切换之前：它把已接受的工具调用写成真实或 interrupted
+        // 结果，下一次尝试的续跑历史才不会出现「有 tool_use 无 tool_result」的残缺回合。
+        // 收口自身失败不能掩盖原始错误，只记录后继续走原有重试/切换决策。
+        await settleSafely(settleFailedAttempt);
+        attemptIndex += 1;
         if (!shouldRetryModel(error, detectFailure(error), remainingRetries)) break;
         remainingRetries -= 1;
       }
@@ -83,10 +112,25 @@ export async function executeWithModelChain(
   }
 
   try {
-    await fallbackToMain();
+    await fallbackToMain({ attemptIndex, chainIndex: selections.length, model: lastModel });
     return { fallbackUsed: true, success: true, usedModel: lastModel };
   } catch (error) {
     return { error: toError(error), fallbackUsed: true, success: false, usedModel: lastModel };
+  }
+}
+
+/**
+ * 执行失败收口；收口本身抛错时只吞掉该错误。
+ *
+ * 原始失败原因（lastError）是调用方最终要上报的事实，收口只是为了让下一次尝试
+ * 的历史完整，不能因为收口出问题就改变「哪个错误导致失败」的归因。
+ */
+async function settleSafely(settle?: () => Promise<void> | void): Promise<void> {
+  if (!settle) return;
+  try {
+    await settle();
+  } catch {
+    // 故意忽略：见函数注释。
   }
 }
 

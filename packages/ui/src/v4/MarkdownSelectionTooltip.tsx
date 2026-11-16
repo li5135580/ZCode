@@ -71,14 +71,6 @@ export function MarkdownSelectionTooltip({
   const [frozen, setFrozen] = useState(false);
   const frozenStateRef = useRef<typeof state>(null);
   if (state) frozenStateRef.current = state;
-  const handleAnnotationOpenChange = useCallback((open: boolean) => {
-    if (open) {
-      setFrozen(true);
-      return;
-    }
-    setFrozen(false);
-    frozenStateRef.current = null;
-  }, []);
   const visibleState = frozen ? frozenStateRef.current : state;
   const finish = useCallback(() => {
     setFrozen(false);
@@ -112,19 +104,20 @@ export function MarkdownSelectionTooltip({
                   : "chat.selections.previewSideUnavailable",
             })
       }
-      onAddToCurrentTask={(comment) => {
+      onAddToCurrentTask={() => {
+        // 上游 SelectionActionMenu 层回调不带参数：评论文本由浮层内部写入 reference。
         dispatchConversationSelectionAdd({
           targetSessionId: target.sessionId,
           draftScopeKey: target.draftScopeKey,
           workspaceKey: target.workspaceKey,
-          reference: createReference(comment),
+          reference: createReference(),
         });
         finish();
       }}
       onAskInSideChat={() => {
         if (sideKey && requestSelectionSideChatOpen(sideKey, createReference())) finish();
       }}
-      onAnnotationOpenChange={handleAnnotationOpenChange}
+      // 上游改为 onComment（无参）：Markdown 预览不支持评论，故不传，继续显示“添加到当前任务”。
     />
   );
 }

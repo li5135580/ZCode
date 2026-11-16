@@ -238,18 +238,18 @@ export function UpdateStatusDialog({
               edgeToEdge ? "w-auto flex-row justify-end" : null,
             )}
           >
-            {showLaterButton ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                className="h-9 px-4"
-                disabled={isUpdateActionPending}
-                onClick={() => onOpenChange(false)}
-              >
-                {intl.formatMessage({ id: "updateDialog.later" })}
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="h-9 px-4"
+              disabled={isUpdateActionPending}
+              onClick={() => onOpenChange(false)}
+            >
+              {intl.formatMessage({
+                id: isDownloading ? "updateDialog.backgroundDownload" : "updateDialog.later",
+              })}
+            </Button>
             {isDownloaded ? (
               <Button
                 type="button"
