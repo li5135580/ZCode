@@ -47,10 +47,12 @@ jobs:
         with:
           node-version: '24.14.0'
 
-      - name: Install C++ toolchain for Windows runtime host
-        # 上游 v3.18 起 afterPack 会硬校验 zcode-runtime-host.exe 与
-        # zcode-installer-process-helper.exe 存在，二者需用 CMake 编译。
-        # GitHub 的 windows-latest 镜像已不再预装 Visual Studio，因此改用 MinGW。
+      - name: Install C++ toolchain for Windows native helpers
+        # afterPack 会硬校验两类 CMake 编译产物：runtime host（v3.18 起：
+        # zcode-runtime-host.exe / zcode-installer-process-helper.exe）与
+        # 预装工具入口 shim（v4.0.0 起：zcode-preinstalled-entry-shim.exe）。
+        # runner 是否带 Visual Studio 的 C++ 工作负载不稳定（2026-11-16 实测缺失），
+        # 两个构建脚本都已改为「vswhere 探测到了用 MSVC，否则用 MinGW」，故这里装 MinGW。
         if: matrix.target == 'win'
         shell: pwsh
         run: |
