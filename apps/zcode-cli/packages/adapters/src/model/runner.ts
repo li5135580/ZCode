@@ -36,7 +36,10 @@ import { resolveRetryOptionsForBudget } from "./retry-budget.js";
 import { DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS } from "./stream-idle-timeout.js";
 import { runGenerateText } from "./runner-generate.js";
 import { runStreamText } from "./runner-stream.js";
-import { normalizeReasoningHistory } from "./reasoning-history-normalization.js";
+import {
+  normalizeOpenAiReasoningHistory,
+  normalizeReasoningHistory,
+} from "./reasoning-history-normalization.js";
 import {
   defaultRuntime,
   type AiSdkModelRuntime,
@@ -398,17 +401,24 @@ function projectRequestHistory(
   request: AiSdkModelTextRequest,
   resolved: ResolvedAiSdkModel,
 ): AiSdkModelTextRequest {
-  // 二开：过去这里只对 anthropic 生效，导致「A 家历史 → B 家模型」时上一家的 reasoning
-  // 原样透传（同模型重试不受影响，跨模型/跨 provider 的思考会被对端拒绝或误当自己的思考）。
-  // normalizeReasoningHistory 内部的 removeCrossModelReasoning 按 providerId + modelId 判定，
-  // 本来就与 providerKind 无关，因此这里对所有 provider 统一投影一次。
-  //
+  const targetModel = { providerId: resolved.providerId, modelId: resolved.modelId };
+  if (resolved.providerKind === "openai") {
+    const messages = normalizeOpenAiReasoningHistory(request.messages, targetModel);
+    return messages === request.messages ? request : { ...request, messages };
+  }
+  if (resolved.providerKind !== "anthropic") {
+    // 二开：上游原本在这里直接 return，导致 openai-compatible / gateway / custom
+    // 端点在「A 家历史 → B 家模型」时把上一家的 reasoning 原样透传。二开用户几乎
+    // 都用 openai-compatible 自定义端点，因此这条兜底分支必须同样做跨模型清理。
+    // 用 OpenAI 版归一化而非 Anthropic 版：后者会补 "(no content)" 占位，
+    // 那是为了满足 Anthropic 的 thinking 配对要求，对其它端点没有必要。
+    const messages = normalizeOpenAiReasoningHistory(request.messages, targetModel);
+    return messages === request.messages ? request : { ...request, messages };
+  }
+
   // 结构归一化过去位于每次物理请求都会经过的 serializer，签名修复重试
   // 因而会再次删除上一轮刚补出的 assistant 占位并合并 user。逻辑请求入口只投影一次，
   // 后续 attempt 只能复用或从这份 request-local history 派生。
-  const messages = normalizeReasoningHistory(request.messages, {
-    providerId: resolved.providerId,
-    modelId: resolved.modelId,
-  });
+  const messages = normalizeReasoningHistory(request.messages, targetModel);
   return messages === request.messages ? request : { ...request, messages };
 }

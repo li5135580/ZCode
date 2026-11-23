@@ -34,7 +34,11 @@ vi.mock("@/components/ui/checkbox.js", () => ({
 }));
 
 function todayKey(): string {
+  // 必须与 createSnapshot 里声明的 timeZone: "UTC" 一致：resolveTodayUsage 会按快照时区
+  // 计算「今天」，用本地日期在 UTC+8 的 0:00-8:00 之间会与 UTC 日期差一天，
+  // 表现为「今日」恒为 0（本地跑黑夜时段必挂，CI 跑 UTC 不暴露）。
   return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

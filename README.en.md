@@ -184,6 +184,7 @@ ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. 
 
 ## Updates
 
+- 2026-11-23: Synced to upstream v4.0.0.
 - 2026-11-16: Synced to upstream v3.18.2.
 - 2026-11-03: Synced to upstream v3.17.2.
 - 2026-10-30: Synced to upstream v3.17.1.
