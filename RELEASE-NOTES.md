@@ -1,4 +1,4 @@
-# ZCode 二开增强版（构建标签 `v4.0.0-fork.1`）
+# ZCode 二开增强版（构建标签 `v4.0.0-fork.2`）
 
 ## 📦 发布内容
 
@@ -7,19 +7,27 @@
 
 | 文件 | 说明 |
 |------|------|
-| `ZCode-Preview-4.0.1-fork.1-win-x64.exe` | Windows x64 安装包，连接生产后端 |
-| `ZCode-Preview-4.0.1-fork.1-win-x64.exe.blockmap` | Windows 差分更新块 |
-| `ZCode-Preview-4.0.1-fork.1-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
-| `ZCode-Preview-4.0.1-fork.1-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
+| `ZCode-Preview-4.0.1-fork.2-win-x64.exe` | Windows x64 安装包，连接生产后端 |
+| `ZCode-Preview-4.0.1-fork.2-win-x64.exe.blockmap` | Windows 差分更新块 |
+| `ZCode-Preview-4.0.1-fork.2-linux-x86_64.AppImage` | Linux x64 免安装包（也是更新产物） |
+| `ZCode-Preview-4.0.1-fork.2-linux-amd64.deb` | Debian/Ubuntu 首次安装包 |
 | `latest.yml` / `latest-linux.yml` | 自动更新元数据 |
 
 > 版本号规则：tag 的 base 版本 patch + 1，再带 fork 序号。tag `v4.0.0-fork.1`
-> 产出 `4.0.1-fork.1`。patch + 1 保证产物版本大于已安装的 `3.18.3-fork.2`，
+> 产出 `4.0.1-fork.2`。patch + 1 保证产物版本大于已安装的 `3.18.3-fork.2`，
 > 老用户能正常收到更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
 > `%LOCALAPPDATA%\Programs\ZCode Preview\`），与官方 ZCode 可并排安装、互不覆盖。
 
+## 🎨 本版修复：用量条图标不跟随状态色
+
+截图反馈：速度前的闪电图标是灰的，而旁边的速度数值是绿的，看起来像两个不相干的东西。
+
+原因在图标基色被写死成「纯装饰的弱化灰」，只有数值走了三档状态色。
+现在速度图标跟随速度档位、上下文图标跟随上下文档位，与数值同色；
+没有实测值时图标仍是灰的——「不知道」不该看起来像「很快」。
+本轮/会话/工具/今日维持中性图标：它们的主色是缓存命中率这类次要信息，跟着染色反而误导。
 ## 🔄 本版对齐上游 v4.0.0
 
 上游从 v3.18.2 跨到 **v4.0.0**：**2209 个文件、+14.98 万行**，新增 690 文件、删除 15 个。
