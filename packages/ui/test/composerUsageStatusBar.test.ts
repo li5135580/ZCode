@@ -217,6 +217,21 @@ describe("ComposerUsageStatusBar", () => {
     expect(bar.querySelector('[data-testid="usage-item-tools"]')).toBeNull();
   });
 
+  it("有状态色的指标让图标跟随数值同色，占位时不染色", async () => {
+    renderBar({ usage: createUsage() });
+
+    const bar = await screen.findByTestId(TID_V4_COMPOSER_USAGE_STATUS_BAR);
+    await waitFor(() => expect(bar.querySelector('[data-testid="usage-item-speed"]')).not.toBeNull());
+
+    // 500 tok/s 属于高档位，图标不能再是纯装饰的弱化灰。
+    const speedIcon = bar.querySelector('[data-testid="usage-item-speed"] > span[aria-hidden="true"]');
+    expect(speedIcon?.className ?? "").not.toContain("text-foreground-subtle/55");
+
+    // 上下文图标同理：该条目已有同色进度条与数值。
+    const ctxIcon = bar.querySelector('[data-testid="usage-item-ctx"] > span[aria-hidden="true"]');
+    expect(ctxIcon?.className ?? "").not.toContain("text-foreground-subtle/55");
+  });
+
   it("enabled=false 时不渲染，也不发起任何查询", async () => {
     const { services, getAppUsageSnapshot, readSessionDebug, getTaskTokenUsage } =
       createServices();

@@ -72,11 +72,14 @@ const TIER_BG: Record<UsageTier, string> = {
  */
 function Item({
   icon,
+  iconClassName,
   children,
   title,
   testId,
 }: {
   icon: React.ReactNode;
+  /** 有状态色的指标（速度/上下文/缓存）让图标跟随数值同色，否则图标是纯装饰。 */
+  iconClassName?: string;
   children: React.ReactNode;
   title?: string;
   testId?: string;
@@ -87,7 +90,7 @@ function Item({
       title={title}
       data-testid={testId}
     >
-      <span className="text-foreground-subtle/55" aria-hidden="true">
+      <span className={cn("text-foreground-subtle/55", iconClassName)} aria-hidden="true">
         {icon}
       </span>
       {children}
@@ -243,6 +246,8 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
       <Item
         key="speed"
         icon={<Zap className="size-[1.15em]" />}
+        // 没有实测值时不染色：灰图标对应「不知道」，避免看起来像「很快」。
+        iconClassName={effectiveRate === null ? undefined : TIER_TEXT[speedTier]}
         title={intl.formatMessage({ id: "chat.composerUsage.speedTitle" })}
         testId="usage-item-speed"
       >
@@ -261,6 +266,7 @@ export const ComposerUsageStatusBar = memo(function ComposerUsageStatusBar({
       <Item
         key="ctx"
         icon={<Activity className="size-[1.15em]" />}
+        iconClassName={TIER_TEXT[contextTier]}
         title={
           contextMax === null
             ? intl.formatMessage({ id: "chat.composerUsage.contextTitle" })
