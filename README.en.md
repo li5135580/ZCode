@@ -24,7 +24,13 @@
 - **Drag to Reorder**: Fallbacks are tried top to bottom; drag the handle or use the
   move up/down buttons to change priority
 - **Independent Reasoning Levels**: Each model can have its own reasoning level
-- **Smart Fallback**: Execute in order, automatically switch to the next fallback after 5 failures
+- **Smart Fallback**: Execute in order. After a model fails it retries the same model according to
+  `retryCount` (default 5, i.e. five retries on top of the first attempt) and only moves to the next
+  fallback once that budget is exhausted; selection/config errors skip retrying and switch at once
+- **Resume Instead of Restart**: Switching models no longer redoes finished work. Tool calls and
+  results from the failed attempt are kept; tools that never finished are marked as "not executed"
+  or "side effects unknown". The new model also gets a note saying the earlier history came from a
+  previous attempt — do not assume its reasoning was right, and do not redo what already succeeded
 - **Main Agent Fallback**: Falls back to main agent when all models fail
 
 **Configuration Example** (Markdown frontmatter):
@@ -60,47 +66,99 @@ modelChain:
   `-preview` suffixes, explicit `[1m]` declarations, `claude-4` / `claude-3.5`,
   `qwen3-vl-flash`, and similar variants
 - **One-click Add**: Add fetched models with one click in the model settings page
+- **Stale Model Cleanup**: When a provider drops models, re-fetching shows a "no longer offered"
+  section at the bottom of the dialog, listing personally-added models the latest fetch did not
+  return. Nothing is pre-selected — tick and delete deliberately. The section only appears when
+  every entry came from a real API response (builtin-config matches and the Anthropic hard-coded
+  fallback never expose it), so hand-tuned context windows are not silently removed
 
-### 3. Multi-Spot Annotations
+### 3. Conversation Selection Notes
 
-- **Extends the original button**: Select part of an assistant reply and click "Add to chat";
-  the menu expands a note field. "Skip and add" is the original one-click behavior without a note
-- **Per-quote notes**: Write what should change at that spot
-- **Annotate several spots**: Mark multiple deviations in one turn, then send them together as
-  a single message
-- **Edit before sending**: Each note can be edited or removed in the composer's quote list
+> This became an **upstream-native feature** in v4.0.0 (selection "Notes"); the fork no longer
+> maintains its own implementation.
+
+- **Select and note**: Select an assistant reply or preview text and click "Note". The comment is
+  optional — leaving it blank is the same as quoting the text alone
+- **Numbered against the body**: Multiple quotes are numbered in the composer and mapped to markers
+  in the message; clicking a number jumps back to edit
+- **Undoable removal**: Removing a note offers undo, so a mis-click does not require re-selecting
+- **Limits**: Up to 8 notes, 16000 characters in total (upstream spec)
 
 ### 4. Usage Status Bar Under the Composer
 
-A lightweight row sits permanently under the chat input, so usage is visible without opening
-Settings:
+A lightweight row sits permanently along the composer edge, **sharing one line** with upstream's
+background-activity / goal / todo capsules (merged in v4.0.0):
 
 | Metric | Meaning | Source |
 | --- | --- | --- |
-| Today | Tokens across all sessions today | Local usage DB, aggregated per day from `model_usage` |
-| This turn | Output speed of the current turn (tok/s) | Cumulative output delta ÷ turn duration |
-| Context | Context window usage percentage | Session snapshot `usage.contextWindow` |
-| Session | Cumulative output tokens of this session | Session snapshot `usage.cumulative` |
+| Context | Context usage percentage plus a progress bar | Session snapshot `usage.contextWindow` |
+| Speed | Measured generation rate of the current turn (tok/s) | Turn detail `duration_ms` − `time_to_first_token_ms` |
+| Turn | Input / output tokens of this turn, with cache hit rate, duration, segments | Turn detail `turn_usage` |
+| Session | Cumulative input / output, cache hit rate, request count | Session snapshot `usage.cumulative` |
+| Subagents | Running / finished subagent counts | Runtime task registry |
+| Tools | Tool calls in this turn | Session snapshot |
+| Today | Tokens across all sessions today plus turns | Local usage DB, aggregated per day from `model_usage` |
 
-- **Details on hover**: Click "Details" to see today's tokens/turns/tool calls, session input,
-  output, cache read/write, and the exact context numbers
-- **Refresh policy**: Today's total is re-queried once per finished turn rather than polled
-  during a run; speed and context follow the live session snapshot
+- **Speed only shows measured values**: when it cannot be measured (buffered SSE, missing TTFT,
+  cross-segment joins) the bar shows `—` instead of estimating from wall-clock time, so the
+  five-digit false rates are gone
+- **Icons follow state colours**: speed and context have three tiers (normal / elevated / alert),
+  and their icon is coloured like the value; the cache hit rate has no icon of its own but its
+  number is tiered the same way. Without a measured value the icon stays neutral grey so "unknown"
+  is not read as "fast"
+- **Seven independently toggleable items**: each can be switched off in Settings, font size is
+  configurable (12px default), the row is centred and wraps on narrow windows
 - **Fully local**: Reads the local SQLite database only — nothing is uploaded or fetched
-- **Hidden while drafting**: With no session yet, the visual focus stays on the input box
+- **Draft state**: With no session yet only the upstream capsules show; the bar appears after the
+  first message
 
-### 5. GitHub Actions Auto Sync & Release
+### 5. One-Click Restart Next to the Help Button
 
-- **Auto Sync Upstream**: Check upstream for new commits hourly and merge them automatically
-  (custom commits are preserved by git)
-- **Auto Build & Release**: Automatically build packages (Windows, macOS, Linux) and publish on push
-- **Conflict Notification**: Automatically create an Issue when merge conflicts occur
+- **Location**: A standalone icon button **left of the Help button** in the title bar (with a
+  hover hint) — not inside the menu
+- **Behaviour**: Full restart (`prepareAppQuit` → `app.relaunch`), the same as quitting and
+  starting again by hand
+- **Use case**: Settings, model or plugin changes that only take effect after a restart
+- **Different from "Restart to update"**: that one installs an update; this one unconditionally
+  restarts the process
 
-### 6. Custom Update Source & Manual Check
+### 6. Update Dialog Shows Release Notes Directly
+
+- **Problem**: upstream's update dialog is a fixed-height window whose notes row was squeezed to
+  zero, so the changelog was only visible in a hover tooltip
+- **Now**: a dedicated "has release notes" height tier (460px) lets you read the full notes right
+  after opening the update button; during download it stays compact (the progress bar is the
+  relevant information then)
+- **Source**: CI injects `RELEASE-NOTES.md` into each platform manifest, so the dialog and the
+  Release body share one source
+
+### 7. GitHub Actions Auto Sync & Release
+
+- **Auto Sync Upstream**: Checks upstream once a day and merges automatically (custom commits are
+  preserved by git). Conflicts touching non-README files open an Issue
+- **Auto Build & Release**: Pushing a tag builds all three platforms and publishes the release
+  (Windows / macOS arm64 / Linux)
+- **Test Gate**: Every push/PR to main runs `pnpm typecheck` and the engineering test whitelist
+  (which includes all of this fork's own cases)
+
+> Sync used to run hourly; after 278 runs GitHub rate-limited Actions on this fork and silently
+> stopped every workflow. It is now daily.
+
+### 8. Custom Update Source & Manual Check
 
 - **Update Source Switch**: Client update detection source points at this repository's GitHub Releases
 - **Manual Check**: Available from the app menu, tray, and Help menu — including the Preview build
 - **Environment Variable Override**: Support custom update source via `ZCODE_UPDATE_FEED_URL`
+
+### 9. Other Reliability Fixes
+
+- **Login credentials survive upgrades**: the installer bundles the `@napi-rs/keyring` native binary
+  and asserts it after packaging, so "lost login after upgrade, cannot sign in again" no longer happens
+- **Cross-provider thinking isolation**: when history from provider A is sent to a model from
+  provider B, A's reasoning is stripped (including `openai-compatible` custom endpoints), while
+  same-provider same-model retries keep the full thinking chain
+- **Remote control entry version**: the entry reports the upstream baseline version, so fork patch
+  versions are not rejected by the gateway whitelist (which caused a blank mobile page / 404)
 
 ---
 
@@ -123,8 +181,11 @@ Download the package for your platform from this repository's
 The installer is **built from this fork's source by CI** (not a patch applied on top of the
 official package), so the enhanced features are already included:
 
-- Subagent model chains
-- Automatic model fetching
+- Subagent model chains (including resume after a mid-run failure)
+- Automatic model fetching plus stale model cleanup
+- Usage status bar under the composer (seven metrics, one line with upstream capsules)
+- One-click restart next to the Help button
+- Release notes shown directly in the update dialog
 - Update source pointing at this repository's Releases
 
 **Notes**:
@@ -145,7 +206,7 @@ official package), so the enhanced features are already included:
   checked manually from the app menu, tray, or Help menu. Each platform reads its own update
   manifest (Windows `latest.yml`, macOS `latest-mac.yml`, Linux `latest-linux.yml`). The
   installer version is injected at build time (`<upstream patch+1>-fork.N`, e.g. tag
-  `v3.17.2-fork.1` produces `3.17.3-fork.1`); within one upstream version a higher fork number is newer.
+  `v4.0.0-fork.2` produces `4.0.1-fork.2`); within one upstream version a higher fork number is newer.
 - **Upgrading from a 3.15.1 build needs one manual step**: that build's updater was never
   initialized, so download the new installer and install over it. Auto-update takes effect
   from that version onward.
@@ -175,6 +236,17 @@ pnpm dev:desktop
 > **non-ASCII characters** (e.g. Chinese), Node's `fs.cpSync` hits a known Windows unlink bug
 > (reports "The operation completed successfully" while actually failing) and stalls at
 > `prepare:agent-bundle`. Use a pure-ASCII path, or rely on the CI build instead.
+>
+> ⚠️ **Windows builds need a C++ toolchain**: packaging first compiles three native helpers
+> (`zcode-runtime-host`, `zcode-installer-process-helper`, `zcode-preinstalled-entry-shim`).
+> With Visual Studio (C++ workload installed) the MSVC generator is used; without it you need
+> CMake plus MinGW-w64 (`x86_64-w64-mingw32-gcc` on `PATH`) and the scripts fall back to the
+> MinGW generator. The MinGW fallback is x64 only — arm64 still requires MSVC.
+>
+> ⚠️ When the dependency tree no longer matches the lockfile, `pnpm install` has to rebuild all
+> of `node_modules` and aborts in a non-interactive terminal
+> (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`). In CI or scripts use
+> `CI=true pnpm install --frozen-lockfile --child-concurrency=1`.
 
 ---
 
