@@ -14,7 +14,7 @@
 | `latest.yml` / `latest-linux.yml` | 自动更新元数据 |
 
 > 版本号规则：tag 的 base 版本 patch + 1，再带 fork 序号。tag `v4.0.0-fork.1`
-> 产出 `4.0.1-fork.2`。patch + 1 保证产物版本大于已安装的 `3.18.3-fork.2`，
+> 产出 `4.0.1-fork.2`。patch + 1 保证产物版本大于上一版的 `4.0.1-fork.1`，
 > 老用户能正常收到更新。
 >
 > 安装包以 **Preview 身份**构建（应用名 `ZCode Preview`、独立数据目录
